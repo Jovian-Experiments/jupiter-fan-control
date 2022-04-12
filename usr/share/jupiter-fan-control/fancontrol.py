@@ -75,7 +75,7 @@ class Device(object):
     def __init__(self, base_path, config, debug = False) -> None:
         self.debug = debug
         self.nice_name = config["nice_name"]
-        self.file_path = get_full_path(base_path, config["name"]) + config["file"]
+        self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
         self.max_temp = config["max_temp"]
         self.temp_deadzone = config["temp_deadzone"]
         self.temp = 0
@@ -142,7 +142,7 @@ class FanController(object):
         self.devices = [ Device(self.base_hwmon_path, device_config, self.debug) for device_config in self.config["devices"] ]
 
         # initialize fan
-        fan_path = get_full_path(self.base_hwmon_path, self.config["fan_name"])
+        fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name"])
         self.fan = Fan(fan_path, self.config["fan_min_speed"], self.config["fan_threshold_speed"], self.config["fan_max_speed"], self.debug)
 
     # pretty print all device values, temp source, and output
