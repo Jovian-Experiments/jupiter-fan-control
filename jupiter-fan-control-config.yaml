@@ -1,0 +1,56 @@
+# config file for juputer-fan-control.service
+
+loop_interval: 0.5
+base_hwmon_path: "/sys/class/hwmon/"
+
+fan_name: jupiter
+fan_min_speed: 10
+fan_threshold_speed: 1500
+fan_max_speed: 7000
+
+devices:
+  - name: acpitz
+    nice_name: CPU
+    max_temp: 90
+    temp_deadzone: 2
+    file: temp1_input
+    type: quadratic
+    A: 2.286
+    B: -188.6
+    C: 5457
+    T_threshold: 55
+    # quadratic fit {{55, 2000}, {80, 5000}, {90, 7000}}
+
+  - name: amdgpu
+    nice_name: GPU
+    max_temp: 90
+    temp_deadzone: 2
+    file: temp1_input
+    type: quadratic
+    A: 2.286
+    B: -188.6
+    C: 5457
+    T_threshold: 55
+    # quadratic fit {{55, 2000}, {80, 5000}, {90, 7000}}
+  - name: nvme
+    nice_name: SSD
+    max_temp: 70.0
+    temp_deadzone: 3
+    file: temp1_input
+    type: pid
+    bandwidth: 25
+    Kp: 4000
+    Ki: 20
+    Kd: 0
+    windup: 50
+
+  - name: jupiter
+    nice_name: CHG
+    max_temp: 10000
+    temp_deadzone: 0
+    file: curr1_input
+    type: quadratic
+    A: 0
+    B: 0
+    C: 2000
+    T_threshold: 1

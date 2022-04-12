@@ -1,0 +1,15 @@
+[Unit]
+Description=Jupiter fan control
+
+[Service]
+Type=simple
+ExecStart=/usr/share/jupiter-fan-controller/fancontrol.py
+
+# disable buffering so STDOUT and STDERR show up immediately in logs
+Environment=PYTHONUNBUFFERED=1
+
+OOMScoreAdjust=-1000
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
