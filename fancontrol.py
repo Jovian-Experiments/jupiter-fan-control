@@ -35,6 +35,32 @@ class Exponential(object):
         self.output = int(self.A * math.exp(self.B * temp_input))
         return max(0, self.output)
 
+# testing variable PID setpoints
+class Sensor(object):
+    def __init__(self, base_path, config, debug = False) -> None:
+        self.debug = debug
+        self.nice_name = config["nice_name"]
+        self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
+        self.n_sample_avg = config["n_sample_avg"]
+        self.value = 0
+        self.avg_value = 0
+        self.buffer_full = False
+        self.values = []
+
+    def get_value(self):
+        with open(self.file_path, 'r') as f:
+            self.value = int(f.read().strip()) / 1000000
+        return self.value
+    
+    def get_avg_value(self) -> float:
+        self.values.append(self.get_value())
+        if self.buffer_full:
+            self.values.remove(0)
+        elif len(self.values) >= self.n_sample_avg:
+            self.buffer_full = True
+        self.avg_value = math.fsum(self.values) / len(self.values)
+        return self.avg_value
+
 # fan object controls all jupiter hwmon parameters
 class Fan(object):
     def __init__(self, fan_path, fan_min_speed, fan_threshold_speed, fan_max_speed, debug = False) -> None:
@@ -44,7 +70,6 @@ class Fan(object):
         self.max_speed = fan_max_speed
         self.fan_path = fan_path
         self.fc_speed = 0
-
         self.set_speed(0)
 
         # with open(self.fan_path + "ramp_rate", 'w') as f:
@@ -75,7 +100,7 @@ class Device(object):
     def __init__(self, base_path, config, debug = False) -> None:
         self.debug = debug
         self.nice_name = config["nice_name"]
-        self.file_path = get_full_path(base_path, config["name"]) + config["file"]
+        self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
         self.max_temp = config["max_temp"]
         self.temp_deadzone = config["temp_deadzone"]
         self.temp = 0
@@ -141,8 +166,11 @@ class FanController(object):
         # initialize list of devices
         self.devices = [ Device(self.base_hwmon_path, device_config, self.debug) for device_config in self.config["devices"] ]
 
+        # initialize list of sensors
+        self.sensors = [ Sensor(self.base_hwmon_path, sensor_config, self.debug) for sensor_config in self.config["sensors"] ]
+
         # initialize fan
-        fan_path = get_full_path(self.base_hwmon_path, self.config["fan_name"])
+        fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name"])
         self.fan = Fan(fan_path, self.config["fan_min_speed"], self.config["fan_threshold_speed"], self.config["fan_max_speed"], self.debug)
 
     # pretty print all device values, temp source, and output
