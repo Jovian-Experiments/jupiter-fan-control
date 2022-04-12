@@ -200,7 +200,7 @@ if __name__ == '__main__':
 
     # specify config file path
     # config_file_path = os.getcwd() + "/config.yaml"
-    config_file_path = "/etc/jupiter-fan-control-config.yaml"
+    config_file_path = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
 
     # initialize controller
     controller = FanController(debug = False, config_file = config_file_path)
