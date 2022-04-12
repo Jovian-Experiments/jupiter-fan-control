@@ -6,7 +6,7 @@ base_hwmon_path: "/sys/class/hwmon/"
 fan_hwmon_name: jupiter
 fan_min_speed: 10
 fan_threshold_speed: 1500
-fan_max_speed: 7000
+fan_max_speed: 7300
 
 devices:
   - hwmon_name: acpitz
