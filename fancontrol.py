@@ -181,6 +181,8 @@ class FanController(object):
             else:
                 print("{}: {:.1f}/{:.0f}  ".format(device.nice_name, device.temp, device.controller.output), end = '')
                 #print("{}: {}  ".format(device.nice_name, device.temp), end = '')
+        for sensor in self.sensors:
+            print("{}: {:.1f}/{:.1f}  ".format(sensor.nice_name, sensor.value, sensor.avg_value), end = '')
         print("Fan[{}]: {}/{}".format(source_name, self.fan.fc_speed, self.fan.get_speed()))
 
     # automatic control loop
@@ -197,6 +199,9 @@ class FanController(object):
                 device.get_temp()
                 outputs.append(device.get_output(device.control_temp))
                 names.append(device.nice_name)
+
+            for sensor in self.sensors:
+                sensor.get_avg_value
 
             if "max" in outputs: # check if any devices were overtemp
                 source_index = outputs.index("max")
