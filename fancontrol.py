@@ -55,7 +55,7 @@ class Sensor(object):
     def get_avg_value(self) -> float:
         self.values.append(self.get_value())
         if self.buffer_full:
-            self.values.remove(0)
+            self.values.pop(0)
         elif len(self.values) >= self.n_sample_avg:
             self.buffer_full = True
         self.avg_value = math.fsum(self.values) / len(self.values)
@@ -201,7 +201,7 @@ class FanController(object):
                 names.append(device.nice_name)
 
             for sensor in self.sensors:
-                sensor.get_avg_value
+                sensor.get_avg_value()
 
             if "max" in outputs: # check if any devices were overtemp
                 source_index = outputs.index("max")
