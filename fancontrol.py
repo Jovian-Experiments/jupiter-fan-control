@@ -4,6 +4,7 @@ import time
 import math
 import yaml
 import os
+import atexit
 from PID import PID
 
 # quadratic function RPM = AT^2 + BT + X
@@ -94,6 +95,12 @@ class Fan(object):
             f.write(str(int(speed)))
 
         self.fc_speed = speed
+
+    def return_to_ec_control(self):
+        with open(self.fan_path + "gain", 'w') as f:
+            f.write(str(10))
+        with open(self.fan_path + "recalculate", 'w') as f:
+            f.write(str(0))
 
 # devices are sources of heat - CPU, GPU, etc.
 class Device(object):
@@ -226,6 +233,10 @@ class FanController(object):
             else: 
                 if self.debug:
                     print("over-ran specified interval, skipping sleep")
+    
+    def on_exit(self):
+        self.fan.return_to_ec_control()
+        print("returning fan to EC control loop")
 
 # main loop
 if __name__ == '__main__':
@@ -237,6 +248,9 @@ if __name__ == '__main__':
 
     # initialize controller
     controller = FanController(debug = False, config_file = config_file_path)
+
+    # register exit handler
+    atexit.register(controller.on_exit)
 
     # start main loop
     controller.loop_control()
