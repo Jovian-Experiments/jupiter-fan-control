@@ -44,11 +44,14 @@ class Fan(object):
         self.max_speed = fan_max_speed
         self.fan_path = fan_path
         self.fc_speed = 0
-
+        self.measured_speed = 0
+        self.take_control_from_ec()
         self.set_speed(0)
 
         # with open(self.fan_path + "ramp_rate", 'w') as f:
         #     f.write(str(1))
+
+    def take_control_from_ec(self):
         with open(self.fan_path + "gain", 'w') as f:
             f.write(str(0))
         with open(self.fan_path + "recalculate", 'w') as f:
@@ -56,12 +59,12 @@ class Fan(object):
 
     def get_speed(self):
         with open(self.fan_path + "fan1_input", 'r') as f:
-            return int(f.read().strip())
+            self.measured_speed = int(f.read().strip())
+        return self.measured_speed
 
     def set_speed(self, speed):
         if speed > self.max_speed:
             speed = self.max_speed
-        # if speed < self.min_speed:
         if speed < self.threshold_speed:
             speed = self.min_speed
 
@@ -162,7 +165,7 @@ class FanController(object):
             else:
                 print("{}: {:.1f}/{:.0f}  ".format(device.nice_name, device.temp, device.controller.output), end = '')
                 #print("{}: {}  ".format(device.nice_name, device.temp), end = '')
-        print("Fan[{}]: {}/{}".format(source_name, self.fan.fc_speed, self.fan.get_speed()))
+        print("Fan[{}]: {}/{}".format(source_name, self.fan.fc_speed, self.fan.measured_speed))
 
     # automatic control loop
     def loop_control(self):
@@ -172,6 +175,10 @@ class FanController(object):
             names = []
 
             # names = ( [device.nice_name for device in self.devices] ) if want to move to tuples for perf
+
+            fan_error = abs(self.fan.fc_speed - self.fan.get_speed())
+            if fan_error > 500:
+                self.fan.take_control_from_ec()
 
             # check temperatures
             for device in self.devices:
