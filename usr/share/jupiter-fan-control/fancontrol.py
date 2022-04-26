@@ -1,5 +1,5 @@
 #!/usr/bin/python -u
-
+import signal
 import time
 import math
 import yaml
@@ -69,6 +69,12 @@ class Fan(object):
             f.write(str(int(speed)))
 
         self.fc_speed = speed
+
+    def return_to_ec_control(self):
+        with open(self.fan_path + "gain", 'w') as f:
+            f.write(str(10))
+        with open(self.fan_path + "recalculate", 'w') as f:
+            f.write(str(0))
 
 # devices are sources of heat - CPU, GPU, etc.
 class Device(object):
@@ -145,6 +151,9 @@ class FanController(object):
         fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name"])
         self.fan = Fan(fan_path, self.config["fan_min_speed"], self.config["fan_threshold_speed"], self.config["fan_max_speed"], self.debug)
 
+        # exit handler
+        signal.signal(signal.SIGTERM, self.on_exit)
+
     # pretty print all device values, temp source, and output
     def print_single(self, source_name):
         for device in self.devices:
@@ -193,6 +202,11 @@ class FanController(object):
             else: 
                 if self.debug:
                     print("over-ran specified interval, skipping sleep")
+    
+    def on_exit(self, signum, frame):
+        self.fan.return_to_ec_control()
+        print("returning fan to EC control loop")
+        exit()
 
 # main loop
 if __name__ == '__main__':
