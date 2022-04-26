@@ -4,6 +4,7 @@ Description=Jupiter fan control
 [Service]
 Type=simple
 #StandardOutput=null
+KillSignal=SIGINT
 ExecStart=/usr/share/jupiter-fan-controller/fancontrol.py
 
 # disable buffering so STDOUT and STDERR show up immediately in logs
