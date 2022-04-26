@@ -67,7 +67,7 @@ class Fan(object):
 
         with open(self.fan_path + "fan1_target", 'w') as f:
             f.write(str(int(speed)))
-
+        
         self.fc_speed = speed
 
     def return_to_ec_control(self):

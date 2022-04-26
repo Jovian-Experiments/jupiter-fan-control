@@ -1,0 +1,10 @@
+[Unit]
+Description=Restart Jupiter-fan-control service after resume
+After=suspend.service
+
+[Service]
+type=simple
+ExecStart=/bin/systemctl --no-block restart jupiter-fan-control.service
+
+[Install]
+WantedBy=suspend.target
