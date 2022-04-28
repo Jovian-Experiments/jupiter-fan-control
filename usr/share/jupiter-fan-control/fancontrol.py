@@ -37,11 +37,12 @@ class Exponential(object):
 
 # fan object controls all jupiter hwmon parameters
 class Fan(object):
-    def __init__(self, fan_path, fan_min_speed, fan_threshold_speed, fan_max_speed, debug = False) -> None:
+    def __init__(self, fan_path, fan_min_speed, fan_threshold_speed, fan_max_speed, fan_gain, debug = False) -> None:
         self.debug = debug
         self.min_speed = fan_min_speed
         self.threshold_speed = fan_threshold_speed
         self.max_speed = fan_max_speed
+        self.gain = fan_gain
         self.fan_path = fan_path
         self.fc_speed = 0
         self.measured_speed = 0
@@ -53,7 +54,7 @@ class Fan(object):
 
     def take_control_from_ec(self):
         with open(self.fan_path + "gain", 'w') as f:
-            f.write(str(0))
+            f.write(str(self.gain))
         with open(self.fan_path + "recalculate", 'w') as f:
             f.write(str(1))
 
@@ -152,7 +153,7 @@ class FanController(object):
 
         # initialize fan
         fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name"])
-        self.fan = Fan(fan_path, self.config["fan_min_speed"], self.config["fan_threshold_speed"], self.config["fan_max_speed"], self.debug)
+        self.fan = Fan(fan_path, self.config["fan_min_speed"], self.config["fan_threshold_speed"], self.config["fan_max_speed"], self.config["fan_gain"], self.debug) 
 
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
