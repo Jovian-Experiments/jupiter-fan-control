@@ -7,7 +7,7 @@ fan_hwmon_name: jupiter
 fan_min_speed: 10
 fan_threshold_speed: 1500
 fan_max_speed: 7300
-fan_gain: 0
+fan_gain: 10
 
 devices:
   - hwmon_name: acpitz
