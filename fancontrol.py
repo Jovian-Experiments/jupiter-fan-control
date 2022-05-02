@@ -87,7 +87,8 @@ class Device(object):
         self.nice_name = config["nice_name"]
         self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
         self.max_temp = config["max_temp"]
-        # self.temp_deadzone = config["temp_deadzone"]
+        self.temp_deadzone = config["temp_deadzone"]
+        self.raw_temp = 0
 
         self.fan_max_speed = 7300
 
@@ -130,7 +131,7 @@ class Device(object):
 
         # self.filtered_output = int(math.fsum(self.outputs_max) / len(self.outputs_max))
         weighted_outputs = [a * b for a,b in zip(self.outputs_max, self.weights)]
-        self.filtered_output = int(math.fsum(weighted_outputs) / math.sum(self.weights))
+        self.filtered_output = int(math.fsum(weighted_outputs) / sum(self.weights))
         return self.filtered_output
 
 
@@ -138,10 +139,10 @@ class Device(object):
     # updates temperatures
     def get_temp(self):
         with open(self.file_path, 'r') as f:
-            self.input_value = int(f.read().strip()) / 1000
+            self.raw_temp = int(f.read().strip()) / 1000
             # only update the control temp if it's outside temp_deadzone
-            # if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
-            #     self.control_temp = self.temp
+            if math.fabs(self.raw_temp - self.input_value) >= self.temp_deadzone:
+                self.input_value = self.raw_temp
         return self.input_value
 
     # returns control output
@@ -205,7 +206,7 @@ class FanController(object):
     def print_csv_line(self):
         print(",", end = '')
         for device in self.devices:
-            print("{},{},".format(device.input_value, device.filtered_output), end = '')
+            print("{},{},".format(device.raw_temp, device.filtered_output), end = '')
         print("{},{}".format(self.fan.fc_speed,self.fan.get_speed()))
 
 
