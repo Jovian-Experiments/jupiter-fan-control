@@ -25,17 +25,17 @@ devices:
     T_threshold: 55
     # quadratic fit {{55, 2000}, {80, 5000}, {90, 7000}}
 
-  # - hwmon_name: amdgpu
-  #   nice_name: GPU
-  #   max_temp: 90
-  #   temp_deadzone: 2
-  #   file: temp1_input
-  #   type: quadratic
-  #   A: 2.286
-  #   B: -188.6
-  #   C: 5457
-  #   T_threshold: 55
-  #   # quadratic fit {{55, 2000}, {80, 5000}, {90, 7000}}
+  - hwmon_name: amdgpu
+    nice_name: GPU
+    max_temp: 90
+    temp_deadzone: 2
+    file: temp1_input
+    type: quadratic
+    A: 2.286
+    B: -188.6
+    C: 5457
+    T_threshold: 55
+    # quadratic fit {{55, 2000}, {80, 5000}, {90, 7000}}
 
   # - hwmon_name: nvme
   #   nice_name: SSD
