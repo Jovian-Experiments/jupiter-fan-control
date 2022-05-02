@@ -88,7 +88,7 @@ class Device(object):
         self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
         self.max_temp = config["max_temp"]
         # self.temp_deadzone = config["temp_deadzone"]
-        self.value = 0
+        self.input_value = 0
         # self.control_temp = 0 
         self.type = config["type"]
         if self.type == "pid":
@@ -108,15 +108,15 @@ class Device(object):
     # updates temperatures
     def get_temp(self) -> None:
         with open(self.file_path, 'r') as f:
-            self.value = int(f.read().strip()) / 1000
+            self.input_value = int(f.read().strip()) / 1000
             # only update the control temp if it's outside temp_deadzone
             # if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
             #     self.control_temp = self.temp
 
     # returns control output
     def get_output(self):
-        output = self.controller.update(self.value)
-        if(self.value > self.max_temp):
+        output = self.controller.update(self.input_value)
+        if(self.input_value > self.max_temp):
             return self.fan_max_speed
         else:
             return max(output, 0)
@@ -174,14 +174,14 @@ class FanController(object):
     def print_csv_line(self):
         print(",", end = '')
         for device in self.devices:
-            print("{},".format(device.value), end = '')
+            print("{},".format(device.input_value), end = '')
         print("{},{}".format(self.fan.fc_speed,self.fan.get_speed()))
 
 
 
 
 
-    # pretty print all device values, temp source, and output
+    # pretty print all device input_values, temp source, and output
     def print_single(self, source_name):
         for device in self.devices:
             if self.debug:
