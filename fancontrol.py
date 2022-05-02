@@ -88,8 +88,18 @@ class Device(object):
         self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
         self.max_temp = config["max_temp"]
         # self.temp_deadzone = config["temp_deadzone"]
+
+        self.max_window_size = int(4 / .5)
+        self.moving_avg_size = int(2 / .5)
         self.input_value = 0
+        self.outputs_max = [0] * self.moving_avg_size
+        self.outputs = [0] * self.max_window_size
+
+        self.filtered_output = 0
+
+
         # self.control_temp = 0 
+
         self.type = config["type"]
         if self.type == "pid":
             self.bandwidth = config["bandwidth"]
@@ -105,13 +115,27 @@ class Device(object):
             print("error loading device controller \n", exc)
             exit(1)
 
+    def update(self):
+        self.get_temp()
+        self.outputs.pop(0)
+        self.outputs.append(self.get_output())
+    
+        self.outputs_max.pop(0)
+        self.outputs_max.append(max(self.outputs))
+
+        self.filtered_output = int(math.fsum(self.outputs_max) / len(self.outputs_max))
+        return self.filtered_output
+
+
+
     # updates temperatures
-    def get_temp(self) -> None:
+    def get_temp(self):
         with open(self.file_path, 'r') as f:
             self.input_value = int(f.read().strip()) / 1000
             # only update the control temp if it's outside temp_deadzone
             # if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
             #     self.control_temp = self.temp
+        return self.input_value
 
     # returns control output
     def get_output(self):
@@ -174,7 +198,7 @@ class FanController(object):
     def print_csv_line(self):
         print(",", end = '')
         for device in self.devices:
-            print("{},".format(device.input_value), end = '')
+            print("{}/{},".format(device.input_value, device.filtered_output), end = '')
         print("{},{}".format(self.fan.fc_speed,self.fan.get_speed()))
 
 
@@ -206,8 +230,7 @@ class FanController(object):
 
             # check temperatures
             for device in self.devices:
-                device.get_temp()
-                outputs.append(device.get_output())
+                outputs.append(device.update())
                 names.append(device.nice_name)
 
             # returns the index of the _highest output_, which is used to command the fan
