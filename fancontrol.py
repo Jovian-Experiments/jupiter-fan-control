@@ -98,7 +98,7 @@ class Device(object):
         self.outputs = [3000] * self.max_window_size
 
         # self.weights = list(range(len(self.outputs_max)))
-        self.weights = [1.0, 2.718, 7.389, 20.08, 54.59, 148.4, 403.4, 1096, 2980, 8103, 22026, 59874]
+        self.weights = [100, 90, 81, 73, 66, 59, 53, 48, 43, 39, 35, 31]
 
         self.filtered_output = 0
 
@@ -130,7 +130,7 @@ class Device(object):
 
         # self.filtered_output = int(math.fsum(self.outputs_max) / len(self.outputs_max))
         weighted_outputs = [a * b for a,b in zip(self.outputs_max, self.weights)]
-        self.filtered_output = int(math.fsum(weighted_outputs) / len(self.weights))
+        self.filtered_output = int(math.fsum(weighted_outputs) / math.sum(self.weights))
         return self.filtered_output
 
 
