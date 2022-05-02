@@ -14,8 +14,7 @@ package() {
     "${srcdir}"/jupiter-fan-control.service 
   install -m 755 -Dt "$pkgdir/usr/share/$pkgname/" \
     "${srcdir}"/fancontrol.py \
-    "${srcdir}"/PID.py
-  install -m 755 -Dt "$pkgdir/etc/" \
+    "${srcdir}"/PID.py \
     "${srcdir}"/jupiter-fan-control-config.yaml
 }
 sha256sums=('SKIP'
