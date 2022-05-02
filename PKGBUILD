@@ -1,6 +1,6 @@
 # Maintainer: Adam Weld <weld@valvesoftware.com>
 
-pkgname=jupiter-fan-controller
+pkgname=jupiter-fan-control
 pkgver=0.0.2
 pkgrel=1
 arch=('any')
