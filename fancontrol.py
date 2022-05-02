@@ -192,13 +192,13 @@ class FanController(object):
     def print_csv_header(self):
         print(",", end = '')
         for device in self.devices:
-            print("{},".format(device.nice_name), end = '')
+            print("{}_IN,{}_OUT,".format(device.nice_name, device.nice_name), end = '')
         print("RPM_COMMANDED,RPM_REAL")
     # TESTING BRANCH ONLY
     def print_csv_line(self):
         print(",", end = '')
         for device in self.devices:
-            print("{}/{},".format(device.input_value, device.filtered_output), end = '')
+            print("{},{},".format(device.input_value, device.filtered_output), end = '')
         print("{},{}".format(self.fan.fc_speed,self.fan.get_speed()))
 
 
