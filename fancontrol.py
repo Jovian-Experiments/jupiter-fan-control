@@ -113,11 +113,11 @@ class Device(object):
             if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
                 self.control_temp = self.temp
 
-    # returns PID control output, or MAX
+    # returns control output
     def get_output(self, temp_input):
         output = self.controller.update(temp_input)
         if(temp_input > self.max_temp):
-            return "max"
+            return self.fan_max_speed
         else:
             return max(output, 0)
 
@@ -147,16 +147,39 @@ class FanController(object):
         # store global parameters
         self.base_hwmon_path = self.config["base_hwmon_path"]
         self.loop_interval = self.config["loop_interval"]
+        self.fan_max_speed = self.config["fan_max_speed"]
 
         # initialize list of devices
         self.devices = [ Device(self.base_hwmon_path, device_config, self.debug) for device_config in self.config["devices"] ]
 
         # initialize fan
         fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name"])
-        self.fan = Fan(fan_path, self.config["fan_min_speed"], self.config["fan_threshold_speed"], self.config["fan_max_speed"], self.config["fan_gain"], self.debug) 
+        self.fan = Fan(fan_path, self.config["fan_min_speed"], self.config["fan_threshold_speed"], self.fan_max_speed, self.config["fan_gain"], self.debug) 
 
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
+
+
+
+
+
+    # TESTING BRANCH ONLY
+    # JOURNAL_INFO, T_CPU, T_GPU, T_SSD, T_BAT, P_APU_SLOW, P_APU_FAST, RPM_FAN
+    def print_csv_header(self):
+        print(",", end = '')
+        for device in self.devices:
+            print("{},".format(device.nice_name), end = '')
+        print("RPM_COMMANDED,RPM_REAL")
+    # TESTING BRANCH ONLY
+    def print_csv_line(self):
+        print(",", end = '')
+        for device in self.devices:
+            print("{},".format(device.value), end = '')
+        print("{},{}".format(self.fan.fc_speed,self.fan.get_speed()))
+
+
+
+
 
     # pretty print all device values, temp source, and output
     def print_single(self, source_name):
@@ -187,21 +210,19 @@ class FanController(object):
                 outputs.append(device.get_output(device.control_temp))
                 names.append(device.nice_name)
 
-            if "max" in outputs: # check if any devices were overtemp
-                source_index = outputs.index("max")
-                # set fan speed to max_speed
-                self.fan.set_speed(self.fan.max_speed)
-            else:
-                # returns the index of the _highest output_, which is used to command the fan
-                source_index = max(range(len(outputs)), key=outputs.__getitem__) 
-                # set fan speed to output
-                self.fan.set_speed(outputs[source_index])
+            # returns the index of the _highest output_, which is used to command the fan
+            source_index = max(range(len(outputs)), key=outputs.__getitem__) 
+            # set fan speed to output
+            self.fan.set_speed(outputs[source_index])
 
             # record the name of the device that gave the highest output
             source_name = names[source_index]
 
             # print all values
-            self.print_single(source_name)
+            # self.print_single(source_name)
+
+            # TESTING BRANCH ONLY
+            self.print_csv_line()
 
             # sleep until interval is complete
             sleep_time = self.loop_interval - (time.time() - start_time)
@@ -226,6 +247,9 @@ if __name__ == '__main__':
 
     # initialize controller
     controller = FanController(debug = False, config_file = config_file_path)
+
+    ## TESTING ONLY
+    controller.print_csv_header()
 
     # start main loop
     controller.loop_control()
