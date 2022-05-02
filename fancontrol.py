@@ -89,11 +89,13 @@ class Device(object):
         self.max_temp = config["max_temp"]
         # self.temp_deadzone = config["temp_deadzone"]
 
-        self.max_window_size = int(4 / .5)
-        self.moving_avg_size = int(2 / .5)
+        self.max_window_size = 4
+        self.moving_avg_size = 4
         self.input_value = 0
-        self.outputs_max = [0] * self.moving_avg_size
-        self.outputs = [0] * self.max_window_size
+        self.outputs_max = [3000] * self.moving_avg_size
+        self.outputs = [3000] * self.max_window_size
+
+        self.weights = list(range(len(self.outputs_max)))
 
         self.filtered_output = 0
 
@@ -123,7 +125,9 @@ class Device(object):
         self.outputs_max.pop(0)
         self.outputs_max.append(max(self.outputs))
 
-        self.filtered_output = int(math.fsum(self.outputs_max) / len(self.outputs_max))
+        # self.filtered_output = int(math.fsum(self.outputs_max) / len(self.outputs_max))
+        weighted_outputs = [a * b for a,b in zip(self.outputs_max, self.weights)]
+        self.filtered_output = int(math.fsum(weighted_outputs) / len(self.weights))
         return self.filtered_output
 
 
