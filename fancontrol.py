@@ -89,13 +89,16 @@ class Device(object):
         self.max_temp = config["max_temp"]
         # self.temp_deadzone = config["temp_deadzone"]
 
+        self.fan_max_speed = 7300
+
         self.max_window_size = 4
-        self.moving_avg_size = 4
+        self.moving_avg_size = 12
         self.input_value = 0
         self.outputs_max = [3000] * self.moving_avg_size
         self.outputs = [3000] * self.max_window_size
 
-        self.weights = list(range(len(self.outputs_max)))
+        # self.weights = list(range(len(self.outputs_max)))
+        self.weights = [1.0, 2.718, 7.389, 20.08, 54.59, 148.4, 403.4, 1096, 2980, 8103, 22026, 59874]
 
         self.filtered_output = 0
 
