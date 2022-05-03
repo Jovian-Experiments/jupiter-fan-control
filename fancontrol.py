@@ -70,6 +70,11 @@ class Fan(object):
         return self.measured_speed
 
     def set_speed(self, speed):
+        if speed > self.max_speed:
+            speed = self.max_speed
+        if speed < self.threshold_speed:
+            speed = self.min_speed
+
         error = speed - self.fc_speed
         if error >= 0:
             if error <= self.ramp_up_rate:
@@ -82,10 +87,7 @@ class Fan(object):
             else:
                 self.fc_speed += self.ramp_down_rate
 
-        if self.fc_speed > self.max_speed:
-            self.fc_speed = self.max_speed
-        if self.fc_speed < self.threshold_speed:
-            self.fc_speed = self.min_speed
+
 
         with open(self.fan_path + "fan1_target", 'w') as f:
             f.write(str(int(self.fc_speed)))
