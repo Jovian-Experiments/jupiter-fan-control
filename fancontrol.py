@@ -46,6 +46,9 @@ class Fan(object):
         self.fan_path = fan_path
         self.fc_speed = 0
         self.measured_speed = 0
+        self.ec_ramp_rate = 254
+        self.ramp_up_rate = 20
+        self.ramp_down_rate = -5
         self.take_control_from_ec()
         self.set_speed(0)
 
@@ -55,8 +58,11 @@ class Fan(object):
     def take_control_from_ec(self):
         with open(self.fan_path + "gain", 'w') as f:
             f.write(str(self.gain))
+        with open(self.fan_path + "ramp_rate", 'w') as f:
+            f.write(str(self.ec_ramp_rate))
         with open(self.fan_path + "recalculate", 'w') as f:
             f.write(str(1))
+
 
     def get_speed(self):
         with open(self.fan_path + "fan1_input", 'r') as f:
@@ -64,15 +70,26 @@ class Fan(object):
         return self.measured_speed
 
     def set_speed(self, speed):
-        if speed > self.max_speed:
-            speed = self.max_speed
-        if speed < self.threshold_speed:
-            speed = self.min_speed
+        error = speed - self.fc_speed
+        if error >= 0:
+            if error <= self.ramp_up_rate:
+                self.fc_speed = speed
+            else:
+                self.fc_speed += self.ramp_up_rate
+        else:
+            if error >= self.ramp_down_rate:
+                self.fc_speed = speed
+            else:
+                self.fc_speed += self.ramp_down_rate
+
+        if self.fc_speed > self.max_speed:
+            self.fc_speed = self.max_speed
+        if self.fc_speed < self.threshold_speed:
+            self.fc_speed = self.min_speed
 
         with open(self.fan_path + "fan1_target", 'w') as f:
-            f.write(str(int(speed)))
+            f.write(str(int(self.fc_speed)))
 
-        self.fc_speed = speed
 
     def return_to_ec_control(self):
         with open(self.fan_path + "gain", 'w') as f:
@@ -166,7 +183,7 @@ class FanController(object):
             else:
                 print("{}: {:.1f}/{:.0f}  ".format(device.nice_name, device.temp, device.controller.output), end = '')
                 #print("{}: {}  ".format(device.nice_name, device.temp), end = '')
-        print("Fan[{}]: {}/{}".format(source_name, self.fan.fc_speed, self.fan.measured_speed))
+        print("Fan[{}]: {}/{}".format(source_name, int(self.fan.fc_speed), self.fan.measured_speed))
 
     # automatic control loop
     def loop_control(self):
