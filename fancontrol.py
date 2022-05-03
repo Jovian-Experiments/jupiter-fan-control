@@ -88,24 +88,8 @@ class Device(object):
         self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
         self.max_temp = config["max_temp"]
         self.temp_deadzone = config["temp_deadzone"]
-        self.raw_temp = 0
-
-        self.fan_max_speed = 7300
-
-        self.max_window_size = 4
-        self.moving_avg_size = 12
-        self.input_value = 0
-        self.outputs_max = [3000] * self.moving_avg_size
-        self.outputs = [3000] * self.max_window_size
-
-        # self.weights = list(range(len(self.outputs_max)))
-        self.weights = [100, 90, 81, 73, 66, 59, 53, 48, 43, 39, 35, 31]
-
-        self.filtered_output = 0
-
-
-        # self.control_temp = 0 
-
+        self.temp = 0
+        self.control_temp = 0 
         self.type = config["type"]
         if self.type == "pid":
             self.bandwidth = config["bandwidth"]
@@ -121,36 +105,19 @@ class Device(object):
             print("error loading device controller \n", exc)
             exit(1)
 
-    def update(self):
-        self.get_temp()
-        self.outputs.pop(0)
-        self.outputs.append(self.get_output())
-    
-        self.outputs_max.pop(0)
-        self.outputs_max.append(max(self.outputs))
-
-        # self.filtered_output = int(math.fsum(self.outputs_max) / len(self.outputs_max))
-        weighted_outputs = [a * b for a,b in zip(self.outputs_max, self.weights)]
-        self.filtered_output = int(math.fsum(weighted_outputs) / sum(self.weights))
-        return self.filtered_output
-
-
-
     # updates temperatures
-    def get_temp(self):
+    def get_temp(self) -> None:
         with open(self.file_path, 'r') as f:
-            # self.raw_temp = int(f.read().strip()) / 1000
-            self.input_value = int(f.read().strip()) / 1000
+            self.temp = int(f.read().strip()) / 1000
             # only update the control temp if it's outside temp_deadzone
-            # if math.fabs(self.raw_temp - self.input_value) >= self.temp_deadzone:
-            #     self.input_value = self.raw_temp
-        return self.input_value
+            if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
+                self.control_temp = self.temp
 
-    # returns control output
-    def get_output(self):
-        output = self.controller.update(self.input_value)
-        if(self.input_value > self.max_temp):
-            return self.fan_max_speed
+    # returns PID control output, or MAX
+    def get_output(self, temp_input):
+        output = self.controller.update(temp_input)
+        if(temp_input > self.max_temp):
+            return "max"
         else:
             return max(output, 0)
 
@@ -180,41 +147,18 @@ class FanController(object):
         # store global parameters
         self.base_hwmon_path = self.config["base_hwmon_path"]
         self.loop_interval = self.config["loop_interval"]
-        self.fan_max_speed = self.config["fan_max_speed"]
 
         # initialize list of devices
         self.devices = [ Device(self.base_hwmon_path, device_config, self.debug) for device_config in self.config["devices"] ]
 
         # initialize fan
         fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name"])
-        self.fan = Fan(fan_path, self.config["fan_min_speed"], self.config["fan_threshold_speed"], self.fan_max_speed, self.config["fan_gain"], self.debug) 
+        self.fan = Fan(fan_path, self.config["fan_min_speed"], self.config["fan_threshold_speed"], self.config["fan_max_speed"], self.config["fan_gain"], self.debug) 
 
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
 
-
-
-
-
-    # TESTING BRANCH ONLY
-    # JOURNAL_INFO, T_CPU, T_GPU, T_SSD, T_BAT, P_APU_SLOW, P_APU_FAST, RPM_FAN
-    def print_csv_header(self):
-        print(",", end = '')
-        for device in self.devices:
-            print("{}_IN,{}_OUT,".format(device.nice_name, device.nice_name), end = '')
-        print("RPM_COMMANDED,RPM_REAL")
-    # TESTING BRANCH ONLY
-    def print_csv_line(self):
-        print(",", end = '')
-        for device in self.devices:
-            print("{},{},".format(device.raw_temp, device.filtered_output), end = '')
-        print("{},{}".format(self.fan.fc_speed,self.fan.get_speed()))
-
-
-
-
-
-    # pretty print all device input_values, temp source, and output
+    # pretty print all device values, temp source, and output
     def print_single(self, source_name):
         for device in self.devices:
             if self.debug:
@@ -239,22 +183,25 @@ class FanController(object):
 
             # check temperatures
             for device in self.devices:
-                outputs.append(device.update())
+                device.get_temp()
+                outputs.append(device.get_output(device.control_temp))
                 names.append(device.nice_name)
 
-            # returns the index of the _highest output_, which is used to command the fan
-            source_index = max(range(len(outputs)), key=outputs.__getitem__) 
-            # set fan speed to output
-            self.fan.set_speed(outputs[source_index])
+            if "max" in outputs: # check if any devices were overtemp
+                source_index = outputs.index("max")
+                # set fan speed to max_speed
+                self.fan.set_speed(self.fan.max_speed)
+            else:
+                # returns the index of the _highest output_, which is used to command the fan
+                source_index = max(range(len(outputs)), key=outputs.__getitem__) 
+                # set fan speed to output
+                self.fan.set_speed(outputs[source_index])
 
             # record the name of the device that gave the highest output
             source_name = names[source_index]
 
             # print all values
-            # self.print_single(source_name)
-
-            # TESTING BRANCH ONLY
-            self.print_csv_line()
+            self.print_single(source_name)
 
             # sleep until interval is complete
             sleep_time = self.loop_interval - (time.time() - start_time)
@@ -279,9 +226,6 @@ if __name__ == '__main__':
 
     # initialize controller
     controller = FanController(debug = False, config_file = config_file_path)
-
-    ## TESTING ONLY
-    controller.print_csv_header()
 
     # start main loop
     controller.loop_control()

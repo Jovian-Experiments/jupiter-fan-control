@@ -9,9 +9,6 @@ fan_threshold_speed: 1500
 fan_max_speed: 7300
 fan_gain: 10
 
-max_window: 4
-avg_window: 2
-
 devices:
   - hwmon_name: acpitz
     nice_name: CPU
@@ -31,31 +28,31 @@ devices:
     temp_deadzone: 2
     file: temp1_input
     type: quadratic
-    A: 2.286
-    B: -188.6
-    C: 5457
+    A: 2.857
+    B: -265.7
+    C: 7771
     T_threshold: 55
-    # quadratic fit {{55, 2000}, {80, 5000}, {90, 7000}}
+    # quadratic fit {{55, 1800}, {80, 4800}, {90, 7000}}
 
-  # - hwmon_name: nvme
-  #   nice_name: SSD
-  #   max_temp: 70.0
-  #   temp_deadzone: 3
-  #   file: temp1_input
-  #   type: pid
-  #   bandwidth: 25
-  #   Kp: 4000
-  #   Ki: 20
-  #   Kd: 0
-  #   windup: 50
+  - hwmon_name: nvme
+    nice_name: SSD
+    max_temp: 70.0
+    temp_deadzone: 3
+    file: temp1_input
+    type: pid
+    bandwidth: 25
+    Kp: 4000
+    Ki: 20
+    Kd: 0
+    windup: 50
 
-  # - hwmon_name: jupiter
-  #   nice_name: CHG
-  #   max_temp: 10000
-  #   temp_deadzone: 0
-  #   file: curr1_input
-  #   type: quadratic
-  #   A: 0
-  #   B: 0
-  #   C: 2000
-  #   T_threshold: 1
+  - hwmon_name: jupiter
+    nice_name: CHG
+    max_temp: 10000
+    temp_deadzone: 0
+    file: curr1_input
+    type: quadratic
+    A: 0
+    B: 0
+    C: 2000
+    T_threshold: 1
