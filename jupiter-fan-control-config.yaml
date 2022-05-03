@@ -16,11 +16,11 @@ devices:
     temp_deadzone: 2
     file: temp1_input
     type: quadratic
-    A: 2.174
-    B: -171.74
-    C: 4926
+    A: 0
+    B: 114
+    C: -3530
     T_threshold: 45
-    # quadratic fit {{45,1600},{80,5100},{91,7300}} 
+    # linear fit {{45,1600},{95,7300}} 
 
   - hwmon_name: amdgpu
     nice_name: GPU
@@ -28,11 +28,11 @@ devices:
     temp_deadzone: 2
     file: temp1_input
     type: quadratic
-    A: 2.174
-    B: -171.74
-    C: 4926
+    A: 0
+    B: 114
+    C: -3530
     T_threshold: 45
-    # quadratic fit {{45,1600},{80,5100},{91,7300}} 
+    # linear fit {{45,1600},{95,7300}} 
 
   - hwmon_name: nvme
     nice_name: SSD
