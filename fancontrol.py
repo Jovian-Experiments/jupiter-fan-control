@@ -46,9 +46,9 @@ class Fan(object):
         self.fan_path = fan_path
         self.fc_speed = 0
         self.measured_speed = 0
-        self.ec_ramp_rate = 254
-        self.ramp_up_rate = 20
-        self.ramp_down_rate = -5
+        self.ec_ramp_rate = 10
+        self.ramp_up_rate = 400
+        self.ramp_down_rate = -100
         self.take_control_from_ec()
         self.set_speed(0)
 
