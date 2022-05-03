@@ -139,10 +139,11 @@ class Device(object):
     # updates temperatures
     def get_temp(self):
         with open(self.file_path, 'r') as f:
-            self.raw_temp = int(f.read().strip()) / 1000
+            # self.raw_temp = int(f.read().strip()) / 1000
+            self.input_value = int(f.read().strip()) / 1000
             # only update the control temp if it's outside temp_deadzone
-            if math.fabs(self.raw_temp - self.input_value) >= self.temp_deadzone:
-                self.input_value = self.raw_temp
+            # if math.fabs(self.raw_temp - self.input_value) >= self.temp_deadzone:
+            #     self.input_value = self.raw_temp
         return self.input_value
 
     # returns control output
