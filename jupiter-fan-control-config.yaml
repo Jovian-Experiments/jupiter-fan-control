@@ -9,6 +9,14 @@ fan_threshold_speed: 1500
 fan_max_speed: 7300
 fan_gain: 10
 
+sensors:
+  - hwmon_name: amdgpu
+    nice_name: P_APU
+    file: power1_average
+    n_sample_avg: 10
+
+
+
 devices:
   - hwmon_name: acpitz
     nice_name: CPU

@@ -35,6 +35,34 @@ class Exponential(object):
         self.output = int(self.A * math.exp(self.B * temp_input))
         return max(0, self.output)
 
+# testing variable PID setpoints
+class Sensor(object):
+    def __init__(self, base_path, config, debug = False) -> None:
+        self.debug = debug
+        self.nice_name = config["nice_name"]
+        self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
+        self.n_sample_avg = config["n_sample_avg"]
+        self.value = 0
+        self.avg_value = 0
+        self.buffer_full = False
+        self.values = []
+
+    def get_value(self):
+        with open(self.file_path, 'r') as f:
+            self.value = int(f.read().strip()) / 1000000
+        return self.value
+    
+    def get_avg_value(self) -> float:
+        self.values.append(self.get_value())
+        if self.buffer_full:
+            self.values.pop(0)
+        elif len(self.values) >= self.n_sample_avg:
+            self.buffer_full = True
+        self.avg_value = math.fsum(self.values) / len(self.values)
+        return self.avg_value
+
+
+
 # fan object controls all jupiter hwmon parameters
 class Fan(object):
     def __init__(self, fan_path, fan_min_speed, fan_threshold_speed, fan_max_speed, fan_gain, debug = False) -> None:
@@ -47,7 +75,7 @@ class Fan(object):
         self.fc_speed = 0
         self.measured_speed = 0
         self.ec_ramp_rate = 10
-        self.ramp_up_rate = 100
+        self.ramp_up_rate = 400
         self.ramp_down_rate = -50
         self.take_control_from_ec()
         self.set_speed(0)
@@ -170,6 +198,9 @@ class FanController(object):
         # initialize list of devices
         self.devices = [ Device(self.base_hwmon_path, device_config, self.debug) for device_config in self.config["devices"] ]
 
+        # initialize list of sensors
+        self.sensors = [ Sensor(self.base_hwmon_path, sensor_config, self.debug) for sensor_config in self.config["sensors"] ]
+
         # initialize fan
         fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name"])
         self.fan = Fan(fan_path, self.config["fan_min_speed"], self.config["fan_threshold_speed"], self.config["fan_max_speed"], self.config["fan_gain"], self.debug) 
@@ -180,11 +211,11 @@ class FanController(object):
     # pretty print all device values, temp source, and output
     def print_single(self, source_name):
         for device in self.devices:
-            if self.debug:
-                print("{}: {}/{}/{}    PID:{:.0f} {:.0f} {:.0f}   ".format(device.nice_name, device.temp, device.pid.SetPoint, device.max_temp, device.pid.PTerm, device.pid.Ki * device.pid.ITerm, device.pid.Kd * device.pid.DTerm), end = '')
-            else:
                 print("{}: {:.1f}/{:.0f}  ".format(device.nice_name, device.temp, device.controller.output), end = '')
                 #print("{}: {}  ".format(device.nice_name, device.temp), end = '')
+        for sensor in self.sensors:
+            print("{}: {:.1f}/{:.1f}  ".format(sensor.nice_name, sensor.value, sensor.avg_value), end = '')
+
         print("Fan[{}]: {}/{}".format(source_name, int(self.fan.fc_speed), self.fan.measured_speed))
 
     # automatic control loop
