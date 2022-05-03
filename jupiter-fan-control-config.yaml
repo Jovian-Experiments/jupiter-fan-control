@@ -15,8 +15,6 @@ sensors:
     file: power1_average
     n_sample_avg: 10
 
-
-
 devices:
   - hwmon_name: acpitz
     nice_name: CPU

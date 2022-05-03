@@ -231,6 +231,9 @@ class FanController(object):
             if fan_error > 500:
                 self.fan.take_control_from_ec()
 
+            for sensor in self.sensors:
+                sensor.get_avg_value()
+
             # check temperatures
             for device in self.devices:
                 device.get_temp()
