@@ -153,7 +153,7 @@ class Device(object):
         elif self.type ==  "exponential":
             self.controller = Exponential(float(config["A"]), float(config["B"]), float(config["T_threshold"]))
         elif self.type ==  "quadratic":
-            self.controller = Quadratic(float(config["A"]), float(config["B"]), float(config["C"]), float(config["T_threshold"]), float(config["P_coeff"]))
+            self.controller = Quadratic(float(config["A"]), float(config["B"]), float(config["C"]), float(config["T_threshold"]), 120)   #, float(config["P_coeff"]))
         else:
             print("error loading device controller \n")
             exit(1)
