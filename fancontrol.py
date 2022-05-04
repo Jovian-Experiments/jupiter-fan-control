@@ -8,11 +8,12 @@ from PID import PID
 
 # quadratic function RPM = AT^2 + BT + X
 class Quadratic(object):
-    def __init__(self, A, B, C, T_threshold ):
+    def __init__(self, A, B, C, T_threshold, power):
         self.A = A
         self.B = B
         self.C = C
         self.T_threshold = T_threshold
+        self.power_coefficient = power
         self.output = 0
     
     def update(self, temp_input):
@@ -20,6 +21,13 @@ class Quadratic(object):
             return 0
         self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
         return max(0, self.output)
+
+    def update(self, temp_input, power_input):
+        if temp_input < self.T_threshold:
+            return 0
+        self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C + power_input * self.power_coefficient)
+        return max(0, self.output)
+
 
 # exponential function RPM = A * exp(B * T) if T > T_threshold
 class Exponential(object):
@@ -115,8 +123,6 @@ class Fan(object):
             else:
                 self.fc_speed += self.ramp_down_rate
 
-
-
         with open(self.fan_path + "fan1_target", 'w') as f:
             f.write(str(int(self.fc_speed)))
 
@@ -147,9 +153,9 @@ class Device(object):
         elif self.type ==  "exponential":
             self.controller = Exponential(float(config["A"]), float(config["B"]), float(config["T_threshold"]))
         elif self.type ==  "quadratic":
-            self.controller = Quadratic(float(config["A"]), float(config["B"]), float(config["C"]), float(config["T_threshold"]))
+            self.controller = Quadratic(float(config["A"]), float(config["B"]), float(config["C"]), float(config["T_threshold"]), float(config["P_coeff"]))
         else:
-            print("error loading device controller \n", exc)
+            print("error loading device controller \n")
             exit(1)
 
     # updates temperatures
@@ -163,6 +169,13 @@ class Device(object):
     # returns PID control output, or MAX
     def get_output(self, temp_input):
         output = self.controller.update(temp_input)
+        if(temp_input > self.max_temp):
+            return "max"
+        else:
+            return max(output, 0)
+
+    def get_output(self, temp_input, power_input):
+        output = self.controller.update(temp_input, power_input)
         if(temp_input > self.max_temp):
             return "max"
         else:
@@ -224,6 +237,7 @@ class FanController(object):
             start_time = time.time()
             outputs = []
             names = []
+            power = 0
 
             # names = ( [device.nice_name for device in self.devices] ) if want to move to tuples for perf
 
@@ -232,12 +246,12 @@ class FanController(object):
                 self.fan.take_control_from_ec()
 
             for sensor in self.sensors:
-                sensor.get_avg_value()
+                power = sensor.get_avg_value()
 
             # check temperatures
             for device in self.devices:
                 device.get_temp()
-                outputs.append(device.get_output(device.control_temp))
+                outputs.append(device.get_output(device.control_temp, power))
                 names.append(device.nice_name)
 
             if "max" in outputs: # check if any devices were overtemp

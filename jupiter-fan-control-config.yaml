@@ -13,32 +13,34 @@ sensors:
   - hwmon_name: amdgpu
     nice_name: P_APU
     file: power1_average
-    n_sample_avg: 10
+    n_sample_avg: 120
 
 devices:
   - hwmon_name: acpitz
     nice_name: CPU
-    max_temp: 90
+    max_temp: 95
     temp_deadzone: 2
     file: temp1_input
     type: quadratic
-    A: 0
-    B: 114
-    C: -3530
+    A: .59
+    B: 3.33
+    C: -145.7
     T_threshold: 45
-    # linear fit {{45,1600},{95,7300}} 
+    P_coeff: 120
+    # quadratic fit (45,1200), (80,3900), (95,5500) 
 
   - hwmon_name: amdgpu
     nice_name: GPU
-    max_temp: 90
+    max_temp: 95
     temp_deadzone: 2
     file: temp1_input
     type: quadratic
-    A: 0
-    B: 114
-    C: -3530
+    A: .59
+    B: 3.33
+    C: -145.7
     T_threshold: 45
-    # linear fit {{45,1600},{95,7300}} 
+    P_coeff: 120
+    # quadratic fit (45,1200), (80,3900), (95,5500) 
 
   - hwmon_name: nvme
     nice_name: SSD
