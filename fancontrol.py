@@ -15,7 +15,7 @@ class Quadratic(object):
         self.T_threshold = T_threshold
         self.output = 0
     
-    def update(self, temp_input):
+    def update(self, temp_input, power):
         if temp_input < self.T_threshold:
             return 0
         self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
