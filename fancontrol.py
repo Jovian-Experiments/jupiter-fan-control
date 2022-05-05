@@ -192,7 +192,7 @@ class Device(object):
         if(temp_input > self.max_temp):
             return "max"
         else:
-            return output
+            return max(output, 0)
 
 # helper function to find correct hwmon* path for a given device name
 def get_full_path(base_path, name):
