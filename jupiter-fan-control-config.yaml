@@ -22,9 +22,9 @@ devices:
     temp_deadzone: 2
     file: temp1_input
     type: hybrid
-    slope: 100
-    A_setpoint: 266.7
-    B_setpoint: -666.7
+    slope: 200
+    A_setpoint: 200
+    B_setpoint: 2000
     T_setpoint: 90
     T_threshold: 45
     # quadratic fit (45,1200), (80,3900), (95,5500) 

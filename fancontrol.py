@@ -68,7 +68,7 @@ class Hybrid(object):
         A, B = self.get_curve(self.get_setpoint(power_input))
         self.output = max(A * temp_input + B, 0)
 
-        print("{} * temp + {} = {}".format(A, B, self.output))
+        #print("{} * temp + {} = {}".format(A, B, self.output))
         return self.output
 
 # testing variable PID setpoints
