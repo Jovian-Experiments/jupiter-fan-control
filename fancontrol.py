@@ -94,8 +94,8 @@ class Fan(object):
         self.fc_speed = 0
         self.measured_speed = 0
         self.ec_ramp_rate = config["ec_ramp_rate"]
-        # self.ramp_up_rate = 400
-        # self.ramp_down_rate = -50
+        self.ramp_up_rate = 400
+        self.ramp_down_rate = -50
         self.take_control_from_ec()
         self.set_speed(0)
 
@@ -139,7 +139,7 @@ class Fan(object):
         with open(self.fan_path + "gain", 'w') as f:
             f.write(str(10))
         with open(self.fan_path + "ramp_rate", 'w') as f:
-            f.write(str(self.20))
+            f.write(str(20))
         with open(self.fan_path + "recalculate", 'w') as f:
             f.write(str(0))
 
