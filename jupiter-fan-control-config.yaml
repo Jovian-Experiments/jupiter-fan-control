@@ -8,6 +8,7 @@ fan_min_speed: 10
 fan_threshold_speed: 1500
 fan_max_speed: 7300
 fan_gain: 10
+ec_ramp_rate: 10
 
 sensors:
   - hwmon_name: amdgpu

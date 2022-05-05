@@ -15,7 +15,7 @@ class Quadratic(object):
         self.T_threshold = T_threshold
         self.output = 0
     
-    def update(self, temp_input, power):
+    def update(self, temp_input, power_input):
         if temp_input < self.T_threshold:
             return 0
         self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
@@ -51,7 +51,7 @@ class Hybrid(object):
 
     def update(self, temp_input, power_input):
         A, B = self.get_curve(self.get_setpoint(power_input))
-        self.output = max(A * temp_input + B, 0)
+        self.output = A * temp_input + B
         return self.output
 
 # testing variable PID setpoints
@@ -84,23 +84,20 @@ class Sensor(object):
 
 # fan object controls all jupiter hwmon parameters
 class Fan(object):
-    def __init__(self, fan_path, fan_min_speed, fan_threshold_speed, fan_max_speed, fan_gain, debug = False) -> None:
+    def __init__(self, fan_path, config, debug = False) -> None:
         self.debug = debug
-        self.min_speed = fan_min_speed
-        self.threshold_speed = fan_threshold_speed
-        self.max_speed = fan_max_speed
-        self.gain = fan_gain
+        self.min_speed = config["fan_min_speed"]
+        self.threshold_speed = config["fan_threshold_speed"]
+        self.max_speed = config["fan_max_speed"]
+        self.gain = config["fan_gain"]
         self.fan_path = fan_path
         self.fc_speed = 0
         self.measured_speed = 0
-        self.ec_ramp_rate = 10
-        self.ramp_up_rate = 400
-        self.ramp_down_rate = -50
+        self.ec_ramp_rate = config["ec_ramp_rate"]
+        # self.ramp_up_rate = 400
+        # self.ramp_down_rate = -50
         self.take_control_from_ec()
         self.set_speed(0)
-
-        # with open(self.fan_path + "ramp_rate", 'w') as f:
-        #     f.write(str(1))
 
     def take_control_from_ec(self):
         with open(self.fan_path + "gain", 'w') as f:
@@ -141,6 +138,8 @@ class Fan(object):
     def return_to_ec_control(self):
         with open(self.fan_path + "gain", 'w') as f:
             f.write(str(10))
+        with open(self.fan_path + "ramp_rate", 'w') as f:
+            f.write(str(self.20))
         with open(self.fan_path + "recalculate", 'w') as f:
             f.write(str(0))
 
@@ -178,16 +177,8 @@ class Device(object):
         if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
             self.control_temp = self.temp
 
-    # returns control output, or MAX
-    def get_output(self, temp_input):
-        output = max(self.controller.update(temp_input), 0)
-        if(temp_input > self.max_temp):
-            return "max"
-        else:
-            return output
-
     def get_output(self, temp_input, power_input):
-        output = max(self.controller.update(temp_input, power_input), 0)
+        output = max(self.controller.update(temp_input, power_input = power_input), 0)
         if(temp_input > self.max_temp):
             return "max"
         else:
@@ -228,7 +219,7 @@ class FanController(object):
 
         # initialize fan
         fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name"])
-        self.fan = Fan(fan_path, self.config["fan_min_speed"], self.config["fan_threshold_speed"], self.config["fan_max_speed"], self.config["fan_gain"], self.debug) 
+        self.fan = Fan(fan_path, self.config, self.debug) 
 
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
@@ -257,13 +248,13 @@ class FanController(object):
             if fan_error > 500:
                 self.fan.take_control_from_ec()
 
-            for sensor in self.sensors:
-                power = sensor.get_avg_value()
+            # for sensor in self.sensors:
+            average_power = self.sensors[0].get_avg_value()
 
             # check temperatures
             for device in self.devices:
                 device.get_temp()
-                outputs.append(device.get_output(device.control_temp, power))
+                outputs.append(device.get_output(device.control_temp, average_power))
                 names.append(device.nice_name)
 
             if "max" in outputs: # check if any devices were overtemp

@@ -60,7 +60,7 @@ class PID:
 
         self.output = 0.0
 
-    def update(self, feedback_value, current_time=None):
+    def update(self, temp_input, power_input, current_time=None):
         """Calculates PID value for given reference feedback
 
         .. math::
@@ -72,7 +72,7 @@ class PID:
            Test PID with Kp=1.2, Ki=1, Kd=0.001 (test_pid.py)
 
         """
-        error = self.SetPoint - feedback_value
+        error = self.SetPoint - temp_input
 
         self.current_time = current_time if current_time is not None else time.time()
         delta_time = self.current_time - self.last_time
