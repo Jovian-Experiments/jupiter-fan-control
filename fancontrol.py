@@ -66,8 +66,8 @@ class Hybrid(object):
 
     def update(self, temp_input, power_input):
         A, B = self.get_curve(self.get_setpoint(power_input))
-        self.output = A * temp_input + B
-        return max(0, self.output)
+        self.output = max(A * temp_input + B, 0)
+        return self.output
 
 # testing variable PID setpoints
 class Sensor(object):
@@ -194,20 +194,20 @@ class Device(object):
             if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
                 self.control_temp = self.temp
 
-    # returns PID control output, or MAX
+    # returns control output, or MAX
     def get_output(self, temp_input):
-        output = self.controller.update(temp_input)
+        output = max(self.controller.update(temp_input), 0)
         if(temp_input > self.max_temp):
             return "max"
         else:
-            return max(output, 0)
+            return output
 
     def get_output(self, temp_input, power_input):
-        output = self.controller.update(temp_input, power_input)
+        output = max(self.controller.update(temp_input, power_input), 0)
         if(temp_input > self.max_temp):
             return "max"
         else:
-            return max(output, 0)
+            return output
 
 # helper function to find correct hwmon* path for a given device name
 def get_full_path(base_path, name):
