@@ -21,21 +21,6 @@ class Quadratic(object):
         self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
         return max(0, self.output)
 
-
-# exponential function RPM = A * exp(B * T) if T > T_threshold
-# class Exponential(object):
-#     def __init__(self, A, B, T_threshold):
-#         self.A = A
-#         self.B = B
-#         self.T_threshold = T_threshold
-#         self.output = 0
-    
-#     def update(self, temp_input):
-#         if temp_input < self.T_threshold:
-#             return 0
-#         self.output = int(self.A * math.exp(self.B * temp_input))
-#         return max(0, self.output)
-
 class Hybrid(object):
     def __init__(self, slope, A_setpoint, B_setpoint, T_setpoint):
         self.slope = slope
@@ -67,8 +52,6 @@ class Hybrid(object):
     def update(self, temp_input, power_input):
         A, B = self.get_curve(self.get_setpoint(power_input))
         self.output = max(A * temp_input + B, 0)
-
-        #print("{} * temp + {} = {}".format(A, B, self.output))
         return self.output
 
 # testing variable PID setpoints
@@ -171,15 +154,14 @@ class Device(object):
         self.temp_deadzone = config["temp_deadzone"]
         self.temp = 0
         self.control_temp = 0 
+
+        # instantiate controller depending on type
         self.type = config["type"]
         if self.type == "pid":
-            self.bandwidth = config["bandwidth"]
             # testing out scaling PID coefficiencts down with bandwidth, so we can tune with less dependance on bandwidth
-            self.controller = PID(float(config["Kp"] / self.bandwidth), float(config["Ki"]), float(config["Kd"]))  
-            self.controller.SetPoint = self.max_temp - self.bandwidth
-            self.controller.setWindup(config["windup"]) # windup limits the I term of the output
-        # elif self.type ==  "exponential":
-        #     self.controller = Exponential(float(config["A"]), float(config["B"]), float(config["T_threshold"]))
+            self.controller = PID(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]))  
+            self.controller.SetPoint = config["T_setpoint"]
+            self.controller.setWindup(config["windup_limit"]) # windup limits the I term of the output
         elif self.type ==  "quadratic":
             self.controller = Quadratic(float(config["A"]), float(config["B"]), float(config["C"]), float(config["T_threshold"]))
         elif self.type == "hybrid":
@@ -192,9 +174,9 @@ class Device(object):
     def get_temp(self) -> None:
         with open(self.file_path, 'r') as f:
             self.temp = int(f.read().strip()) / 1000
-            # only update the control temp if it's outside temp_deadzone
-            if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
-                self.control_temp = self.temp
+        # only update the control temp if it's outside temp_deadzone
+        if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
+            self.control_temp = self.temp
 
     # returns control output, or MAX
     def get_output(self, temp_input):

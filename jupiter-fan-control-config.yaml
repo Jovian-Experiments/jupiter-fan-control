@@ -26,8 +26,6 @@ devices:
     A_setpoint: 200
     B_setpoint: 2000
     T_setpoint: 90
-    T_threshold: 45
-    # quadratic fit (45,1200), (80,3900), (95,5500) 
 
   # - hwmon_name: amdgpu
   #   nice_name: GPU
@@ -48,11 +46,11 @@ devices:
     temp_deadzone: 3
     file: temp1_input
     type: pid
-    bandwidth: 25
-    Kp: 4000
-    Ki: 20
+    T_setpoint: 60
+    Kp: 2000
+    Ki: 200
     Kd: 0
-    windup: 50
+    windup_limit: 50
 
   - hwmon_name: jupiter
     nice_name: CHG
