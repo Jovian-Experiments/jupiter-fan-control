@@ -43,6 +43,39 @@ class Exponential(object):
         self.output = int(self.A * math.exp(self.B * temp_input))
         return max(0, self.output)
 
+class Hybrid(object):
+    def __init__(self, slope, A_setpoint, B_setpoint, T_setpoint):
+        self.slope = slope
+        self.A_setpoint = A_setpoint
+        self.B_setpoint = B_setpoint
+        self.T_setpoint = T_setpoint
+        self.output = 0
+
+    '''
+    input is the linear setpoint curve (power in, output is RPM that in steady state will cool unit to a constant temperature) and the temp
+        A_setpoint * Power + B_setpoint = RPM_center
+
+    get_setpoint(power) -> RPM
+
+    get_curve(rpm) -> A_output, B_output
+
+    '''
+
+    def get_setpoint(self, power_input):
+        rpm_setpoint = self.A_setpoint * power_input + self.B_setpoint
+        return rpm_setpoint
+
+    def get_curve(self, rpm_setpoint):
+        # we are finding the equation for the line that passes through (rpm_setpoint, T_setpoint) at slope self.slope
+        A_output = self.slope
+        B_output = rpm_setpoint - A_output * self.T_setpoint
+        return A_output, B_output
+
+    def update(self, temp_input, power_input):
+        A, B = self.get_curve(self.get_setpoint(power_input))
+        self.output = A * temp_input + B
+        return max(0, self.output)
+
 # testing variable PID setpoints
 class Sensor(object):
     def __init__(self, base_path, config, debug = False) -> None:
@@ -153,7 +186,9 @@ class Device(object):
         elif self.type ==  "exponential":
             self.controller = Exponential(float(config["A"]), float(config["B"]), float(config["T_threshold"]))
         elif self.type ==  "quadratic":
-            self.controller = Quadratic(float(config["A"]), float(config["B"]), float(config["C"]), float(config["T_threshold"]), 120)   #, float(config["P_coeff"]))
+            self.controller = Quadratic(float(config["A"]), float(config["B"]), float(config["C"]), float(config["T_threshold"]))
+        elif self.type == "hybrid":
+            self.controller = Hybrid(float(config["A_setpoint"]), float(config["B_setpoint"]), int(config["T_setpoint"]))
         else:
             print("error loading device controller \n")
             exit(1)
