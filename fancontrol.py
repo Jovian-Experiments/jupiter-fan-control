@@ -94,8 +94,8 @@ class Fan(object):
         self.fc_speed = 0
         self.measured_speed = 0
         self.ec_ramp_rate = config["ec_ramp_rate"]
-        self.ramp_up_rate = 400
-        self.ramp_down_rate = -50
+        # self.ramp_up_rate = 400
+        # self.ramp_down_rate = -50
         self.take_control_from_ec()
         self.set_speed(0)
 
@@ -113,24 +113,34 @@ class Fan(object):
             self.measured_speed = int(f.read().strip())
         return self.measured_speed
 
+    # def set_speed(self, speed):
+    #     if speed > self.max_speed:
+    #         speed = self.max_speed
+    #     if speed < self.threshold_speed:
+    #         speed = self.min_speed
+
+    #     error = speed - self.fc_speed
+    #     if error >= 0:
+    #         if error <= self.ramp_up_rate:
+    #             self.fc_speed = speed
+    #         else:
+    #             self.fc_speed += self.ramp_up_rate
+    #     else:
+    #         if error >= self.ramp_down_rate:
+    #             self.fc_speed = speed
+    #         else:
+    #             self.fc_speed += self.ramp_down_rate
+
+    #     with open(self.fan_path + "fan1_target", 'w') as f:
+    #         f.write(str(int(self.fc_speed)))
+
     def set_speed(self, speed):
         if speed > self.max_speed:
             speed = self.max_speed
         if speed < self.threshold_speed:
             speed = self.min_speed
-
-        error = speed - self.fc_speed
-        if error >= 0:
-            if error <= self.ramp_up_rate:
-                self.fc_speed = speed
-            else:
-                self.fc_speed += self.ramp_up_rate
-        else:
-            if error >= self.ramp_down_rate:
-                self.fc_speed = speed
-            else:
-                self.fc_speed += self.ramp_down_rate
-
+        self.fc_speed = speed
+       
         with open(self.fan_path + "fan1_target", 'w') as f:
             f.write(str(int(self.fc_speed)))
 
