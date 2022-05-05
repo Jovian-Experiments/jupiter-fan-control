@@ -188,7 +188,7 @@ class Device(object):
         elif self.type ==  "quadratic":
             self.controller = Quadratic(float(config["A"]), float(config["B"]), float(config["C"]), float(config["T_threshold"]))
         elif self.type == "hybrid":
-            self.controller = Hybrid(float(config["A_setpoint"]), float(config["B_setpoint"]), int(config["T_setpoint"]))
+            self.controller = Hybrid(float(config["slope"]), float(config["A_setpoint"]), float(config["B_setpoint"]), int(config["T_setpoint"]))
         else:
             print("error loading device controller \n")
             exit(1)
