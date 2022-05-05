@@ -8,12 +8,11 @@ from PID import PID
 
 # quadratic function RPM = AT^2 + BT + X
 class Quadratic(object):
-    def __init__(self, A, B, C, T_threshold, power):
+    def __init__(self, A, B, C, T_threshold):
         self.A = A
         self.B = B
         self.C = C
         self.T_threshold = T_threshold
-        self.power_coefficient = power
         self.output = 0
     
     def update(self, temp_input):
@@ -22,26 +21,20 @@ class Quadratic(object):
         self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
         return max(0, self.output)
 
-    def update(self, temp_input, power_input):
-        if temp_input < self.T_threshold:
-            return 0
-        self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C + power_input * self.power_coefficient)
-        return max(0, self.output)
-
 
 # exponential function RPM = A * exp(B * T) if T > T_threshold
-class Exponential(object):
-    def __init__(self, A, B, T_threshold):
-        self.A = A
-        self.B = B
-        self.T_threshold = T_threshold
-        self.output = 0
+# class Exponential(object):
+#     def __init__(self, A, B, T_threshold):
+#         self.A = A
+#         self.B = B
+#         self.T_threshold = T_threshold
+#         self.output = 0
     
-    def update(self, temp_input):
-        if temp_input < self.T_threshold:
-            return 0
-        self.output = int(self.A * math.exp(self.B * temp_input))
-        return max(0, self.output)
+#     def update(self, temp_input):
+#         if temp_input < self.T_threshold:
+#             return 0
+#         self.output = int(self.A * math.exp(self.B * temp_input))
+#         return max(0, self.output)
 
 class Hybrid(object):
     def __init__(self, slope, A_setpoint, B_setpoint, T_setpoint):
@@ -183,8 +176,8 @@ class Device(object):
             self.controller = PID(float(config["Kp"] / self.bandwidth), float(config["Ki"]), float(config["Kd"]))  
             self.controller.SetPoint = self.max_temp - self.bandwidth
             self.controller.setWindup(config["windup"]) # windup limits the I term of the output
-        elif self.type ==  "exponential":
-            self.controller = Exponential(float(config["A"]), float(config["B"]), float(config["T_threshold"]))
+        # elif self.type ==  "exponential":
+        #     self.controller = Exponential(float(config["A"]), float(config["B"]), float(config["T_threshold"]))
         elif self.type ==  "quadratic":
             self.controller = Quadratic(float(config["A"]), float(config["B"]), float(config["C"]), float(config["T_threshold"]))
         elif self.type == "hybrid":
