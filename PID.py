@@ -60,7 +60,7 @@ class PID:
 
         self.output = 0.0
 
-    def update(self, temp_input, power_input, current_time=None):
+    def update(self, temp_input, _, current_time=None):
         """Calculates PID value for given reference feedback
 
         .. math::
