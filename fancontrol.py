@@ -177,7 +177,7 @@ class Device(object):
         elif self.type == "hybrid":
             self.controller = Hybrid(float(config["slope"]), float(config["A_setpoint"]), float(config["B_setpoint"]), int(config["T_setpoint"]))
         elif self.type == "feedforward":
-            self.controller = FeedForward(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup_limit"]) float(config["A_setpoint"]), float(config["B_setpoint"]), int(config["T_setpoint"]))
+            self.controller = FeedForward(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup_limit"]), float(config["A_setpoint"]), float(config["B_setpoint"]), int(config["T_setpoint"]))
         else:
             print("error loading device controller \n")
             exit(1)
