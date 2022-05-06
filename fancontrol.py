@@ -19,7 +19,7 @@ class Quadratic(object):
         if temp_input < self.T_threshold:
             return 0
         self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
-        return max(0, self.output)
+        return self.output
 
 class Hybrid(object):
     def __init__(self, slope, A_setpoint, B_setpoint, T_setpoint):
@@ -54,7 +54,27 @@ class Hybrid(object):
         self.output = A * temp_input + B
         return self.output
 
+class FeedForward(object):
+    def __init__(self) -> None:
+        Kp = 10
+        Ki = 2
+        Kd = 0
+        windup = 1000
+        pid_setpoint = 90
+        self.pid = PID(Kp, Ki, Kd)  
+        self.pid.SetPoint = pid_setpoint
+        self.pid.setWindup(windup)
 
+        slope = 150
+        A = 200
+        B = 2000
+        self.ff = Hybrid(slope, A, B, pid_setpoint)
+
+        self.output = 0
+
+    def update(self, temp_input, power_input):
+        self.output = self.pid.update(temp_input, power_input) + self.ff.update(temp_input, power_input)
+        return self.output
 
 # fan object controls all jupiter hwmon parameters
 class Fan(object):
@@ -155,6 +175,8 @@ class Device(object):
             self.controller = Quadratic(float(config["A"]), float(config["B"]), float(config["C"]), float(config["T_threshold"]))
         elif self.type == "hybrid":
             self.controller = Hybrid(float(config["slope"]), float(config["A_setpoint"]), float(config["B_setpoint"]), int(config["T_setpoint"]))
+        elif self.type == "feedforward":
+            self.controller = FeedForward()
         else:
             print("error loading device controller \n")
             exit(1)
