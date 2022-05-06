@@ -49,10 +49,10 @@ devices:
     file: temp1_input
     type: pid
     T_setpoint: 60
-    Kp: 2000
-    Ki: 200
+    Kp: 200
+    Ki: 2 
     Kd: 0
-    windup_limit: 50
+    windup_limit: 3000
 
   - hwmon_name: jupiter
     nice_name: CHG
