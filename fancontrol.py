@@ -15,7 +15,7 @@ class Quadratic(object):
         self.T_threshold = T_threshold
         self.output = 0
     
-    def update(self, temp_input, power_input):
+    def update(self, temp_input, _):
         if temp_input < self.T_threshold:
             return 0
         self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
@@ -53,32 +53,6 @@ class Hybrid(object):
         A, B = self.get_curve(self.get_setpoint(power_input))
         self.output = A * temp_input + B
         return self.output
-
-# testing variable PID setpoints
-class Sensor(object):
-    def __init__(self, base_path, config, debug = False) -> None:
-        self.debug = debug
-        self.nice_name = config["nice_name"]
-        self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
-        self.n_sample_avg = config["n_sample_avg"]
-        self.value = 0
-        self.avg_value = 0
-        self.buffer_full = False
-        self.values = []
-
-    def get_value(self):
-        with open(self.file_path, 'r') as f:
-            self.value = int(f.read().strip()) / 1000000
-        return self.value
-    
-    def get_avg_value(self) -> float:
-        self.values.append(self.get_value())
-        if self.buffer_full:
-            self.values.pop(0)
-        elif len(self.values) >= self.n_sample_avg:
-            self.buffer_full = True
-        self.avg_value = math.fsum(self.values) / len(self.values)
-        return self.avg_value
 
 
 
@@ -155,14 +129,20 @@ class Fan(object):
 
 # devices are sources of heat - CPU, GPU, etc.
 class Device(object):
-    def __init__(self, base_path, config, debug = False) -> None:
+    def __init__(self, base_path, config, fan_max_speed, n_sample_avg, debug = False) -> None:
         self.debug = debug
+        self.fan_max_speed = fan_max_speed
+        self.n_sample_avg = n_sample_avg
         self.nice_name = config["nice_name"]
         self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
         self.max_temp = config["max_temp"]
         self.temp_deadzone = config["temp_deadzone"]
         self.temp = 0
-        self.control_temp = 0 
+        self.control_temp = 0 # deadzone temp
+        self.control_output = 0 # controller output if > 0, max fan speed if max temp reached
+        self.buffer_full = False
+        self.control_temps = []
+        self.avg_control_temp = 0
 
         # instantiate controller depending on type
         self.type = config["type"]
@@ -186,13 +166,52 @@ class Device(object):
         # only update the control temp if it's outside temp_deadzone
         if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
             self.control_temp = self.temp
+        return self.control_temp
+
+    def get_avg_temp(self):
+        self.control_temps.append(self.get_temp())
+        if self.buffer_full:
+            self.control_temps.pop(0)
+        elif len(self.control_temps) >= self.n_sample_avg:
+            self.buffer_full = True
+        self.avg_control_temp = math.fsum(self.control_temps) / len(self.control_temps)
+        return self.avg_control_temp
+
 
     def get_output(self, temp_input, power_input):
-        output = max(self.controller.update(temp_input, power_input = power_input), 0)
+        self.controller.update(temp_input, power_input)
+        self.control_output = max(self.controller.output, 0)
         if(temp_input > self.max_temp):
-            return "max"
-        else:
-            return max(output, 0)
+            self.control_output = self.fan_max_speed
+        return self.control_output
+
+# testing variable PID setpoints
+class Sensor(object):
+    def __init__(self, base_path, config, debug = False) -> None:
+        self.debug = debug
+        self.nice_name = config["nice_name"]
+        self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
+        self.n_sample_avg = config["n_sample_avg"]
+        self.value = 0
+        self.avg_value = 0
+        self.buffer_full = False
+        self.values = []
+
+    def get_value(self):
+        with open(self.file_path, 'r') as f:
+            self.value = int(f.read().strip()) / 1000000
+        return self.value
+    
+    def get_avg_value(self) -> float:
+        self.values.append(self.get_value())
+        if self.buffer_full:
+            self.values.pop(0)
+        elif len(self.values) >= self.n_sample_avg:
+            self.buffer_full = True
+        self.avg_value = math.fsum(self.values) / len(self.values)
+        return self.avg_value
+
+
 
 # helper function to find correct hwmon* path for a given device name
 def get_full_path(base_path, name):
@@ -220,16 +239,17 @@ class FanController(object):
         # store global parameters
         self.base_hwmon_path = self.config["base_hwmon_path"]
         self.loop_interval = self.config["loop_interval"]
-
-        # initialize list of devices
-        self.devices = [ Device(self.base_hwmon_path, device_config, self.debug) for device_config in self.config["devices"] ]
-
-        # initialize list of sensors
-        self.sensors = [ Sensor(self.base_hwmon_path, sensor_config, self.debug) for sensor_config in self.config["sensors"] ]
+        self.control_to_sense_ratio = self.config["control_to_sense_ratio"]
 
         # initialize fan
         fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name"])
         self.fan = Fan(fan_path, self.config, self.debug) 
+
+        # initialize list of devices
+        self.devices = [ Device(self.base_hwmon_path, device_config, self.fan.max_speed, self.control_to_sense_ratio, self.debug) for device_config in self.config["devices"] ]
+
+        # initialize APU power sensor
+        self.power_sensor = Sensor(self.base_hwmon_path, self.config["sensors"], self.debug)
 
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
@@ -237,59 +257,53 @@ class FanController(object):
     # pretty print all device values, temp source, and output
     def print_single(self, source_name):
         for device in self.devices:
-                print("{}: {:.1f}/{:.0f}  ".format(device.nice_name, device.temp, device.controller.output), end = '')
+                print("{}: {:.1f}/{:.0f}  ".format(device.nice_name, device.temp, device.control_output), end = '')
                 #print("{}: {}  ".format(device.nice_name, device.temp), end = '')
-        for sensor in self.sensors:
-            print("{}: {:.1f}/{:.1f}  ".format(sensor.nice_name, sensor.value, sensor.avg_value), end = '')
+        print("{}: {:.1f}/{:.1f}  ".format(self.power_sensor.nice_name, self.power_sensor.value, self.power_sensor.avg_value), end = '')
 
         print("Fan[{}]: {}/{}".format(source_name, int(self.fan.fc_speed), self.fan.measured_speed))
+
+    def read_sensors(self):
+        start_time = time.time()
+
+        self.power_sensor.get_avg_value()
+
+        for device in self.devices:
+            device.get_temp()
+
+        sleep_time = self.loop_interval - (time.time() - start_time)
+        if sleep_time > 0:
+            time.sleep(sleep_time)
 
     # automatic control loop
     def loop_control(self):
         while True:
-            start_time = time.time()
-            outputs = []
-            names = []
-            power = 0
-
-            # names = ( [device.nice_name for device in self.devices] ) if want to move to tuples for perf
-
             fan_error = abs(self.fan.fc_speed - self.fan.get_speed())
             if fan_error > 500:
                 self.fan.take_control_from_ec()
 
-            # for sensor in self.sensors:
-            average_power = self.sensors[0].get_avg_value()
+            for _ in range(self.control_to_sense_ratio):
+                self.read_sensors()
 
-            # check temperatures
+            # get outputs
             for device in self.devices:
-                device.get_temp()
-                outputs.append(device.get_output(device.control_temp, average_power))
-                names.append(device.nice_name)
+                device.get_output(device.control_temp, self.power_sensor.avg_value)
 
-            if "max" in outputs: # check if any devices were overtemp
-                source_index = outputs.index("max")
-                # set fan speed to max_speed
-                self.fan.set_speed(self.fan.max_speed)
-            else:
-                # returns the index of the _highest output_, which is used to command the fan
-                source_index = max(range(len(outputs)), key=outputs.__getitem__) 
-                # set fan speed to output
-                self.fan.set_speed(outputs[source_index])
+            max_output = max(device.control_output for device in self.devices)
+            self.fan.set_speed(max_output)
 
-            # record the name of the device that gave the highest output
-            source_name = names[source_index]
-
+            # find source name for the max control output
+            source_name = next(device for device in self.devices if device.control_output == max_output).nice_name
             # print all values
             self.print_single(source_name)
 
-            # sleep until interval is complete
-            sleep_time = self.loop_interval - (time.time() - start_time)
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-            else: 
-                if self.debug:
-                    print("over-ran specified interval, skipping sleep")
+            # # sleep until interval is complete
+            # sleep_time = self.loop_interval - (time.time() - start_time)
+            # if sleep_time > 0:
+            #     time.sleep(sleep_time)
+            # else: 
+            #     if self.debug:
+            #         print("over-ran specified interval, skipping sleep")
     
     def on_exit(self, signum, frame):
         self.fan.return_to_ec_control()
