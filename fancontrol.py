@@ -55,28 +55,26 @@ class Hybrid(object):
         return self.output
 
 class FeedForward(object):
-    def __init__(self) -> None:
-        Kp = 10
-        Ki = 2
-        Kd = 0
+    def __init__(self, Kp, Ki, Kd, windup, A_setpoint, B_setpoint, T_setpoint) -> None:
         windup = 1000
-        pid_setpoint = 90
+        self.A_setpoint = A_setpoint
+        self.B_setpoint = B_setpoint
+        self.T_setpoint = T_setpoint
         self.pid = PID(Kp, Ki, Kd)  
-        self.pid.SetPoint = pid_setpoint
+        self.pid.SetPoint = T_setpoint
         self.pid.setWindup(windup)
-
-        slope = 150
-        A = 200
-        B = 2000
-        self.ff = Hybrid(slope, A, B, pid_setpoint)
 
         self.output = 0
 
+    def get_ff_setpoint(self, power_input):
+        rpm_setpoint = self.A_setpoint * power_input + self.B_setpoint
+        return rpm_setpoint
+
     def update(self, temp_input, power_input):
-        pid_output = self.pid.update(temp_input, power_input)
-        ff_output = self.ff.update(temp_input, power_input)
+        pid_output = self.pid.update(temp_input)
+        ff_output = self.get_ff_setpoint(power_input)
         self.output = pid_output + ff_output
-        print("FF:{:.0f}    PID: P{:.0f} I{:.0f} D{:.0f} = {:.0f}".format(ff_output, self.pid.PTerm, self.pid.Ki * self.pid.ITerm, self.pid.Kd * self.pid.DTerm, pid_output))
+        print("FF:{:.0f}    PID: {:.0f} {:.0f} {:.0f} = {:.0f}".format(ff_output, self.pid.PTerm, self.pid.Ki * self.pid.ITerm, self.pid.Kd * self.pid.DTerm, pid_output))
         return self.output
 
 # fan object controls all jupiter hwmon parameters
@@ -179,7 +177,7 @@ class Device(object):
         elif self.type == "hybrid":
             self.controller = Hybrid(float(config["slope"]), float(config["A_setpoint"]), float(config["B_setpoint"]), int(config["T_setpoint"]))
         elif self.type == "feedforward":
-            self.controller = FeedForward()
+            self.controller = FeedForward(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup_limit"]) float(config["A_setpoint"]), float(config["B_setpoint"]), int(config["T_setpoint"]))
         else:
             print("error loading device controller \n")
             exit(1)
@@ -235,8 +233,6 @@ class Sensor(object):
             self.buffer_full = True
         self.avg_value = math.fsum(self.values) / len(self.values)
         return self.avg_value
-
-
 
 # helper function to find correct hwmon* path for a given device name
 def get_full_path(base_path, name):

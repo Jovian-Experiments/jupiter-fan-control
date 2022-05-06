@@ -15,7 +15,7 @@ sensors:
   - hwmon_name: amdgpu
     nice_name: P_APU
     file: power1_average
-    n_sample_avg: 120
+    n_sample_avg: 600
 
 devices:
   - hwmon_name: acpitz
@@ -28,6 +28,10 @@ devices:
     A_setpoint: 200
     B_setpoint: 2000
     T_setpoint: 90
+    Kp: 100
+    Ki: 20 
+    Kd: 0
+    windup_limit: 200
 
   # - hwmon_name: amdgpu
   #   nice_name: GPU
