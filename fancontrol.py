@@ -73,7 +73,10 @@ class FeedForward(object):
         self.output = 0
 
     def update(self, temp_input, power_input):
-        self.output = self.pid.update(temp_input, power_input) + self.ff.update(temp_input, power_input)
+        pid_output = self.pid.update(temp_input, power_input)
+        ff_output = self.ff.update(temp_input, power_input)
+        self.output = pid_output + ff_output
+        print("FF:{:.0f}    PID: P{:.0f} I{:.0f} D{:.0f} = {:.0f}".format(ff_output, self.pid.PTerm, self.pid.Ki * self.pid.ITerm, self.pid.Kd * self.pid.DTerm, pid_output))
         return self.output
 
 # fan object controls all jupiter hwmon parameters

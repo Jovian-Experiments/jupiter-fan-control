@@ -23,7 +23,7 @@ devices:
     max_temp: 95
     temp_deadzone: 2
     file: temp1_input
-    type: hybrid
+    type: feedforward 
     slope: 200
     A_setpoint: 200
     B_setpoint: 2000
