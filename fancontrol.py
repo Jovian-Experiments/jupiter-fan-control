@@ -249,7 +249,7 @@ class FanController(object):
         self.devices = [ Device(self.base_hwmon_path, device_config, self.fan.max_speed, self.control_to_sense_ratio, self.debug) for device_config in self.config["devices"] ]
 
         # initialize APU power sensor
-        self.power_sensor = Sensor(self.base_hwmon_path, self.config["sensors"], self.debug)
+        self.power_sensor = Sensor(self.base_hwmon_path, self.config["sensors"][0], self.debug)
 
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
