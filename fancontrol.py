@@ -168,7 +168,6 @@ class Device(object):
         # instantiate controller depending on type
         self.type = config["type"]
         if self.type == "pid":
-            # testing out scaling PID coefficiencts down with bandwidth, so we can tune with less dependance on bandwidth
             self.controller = PID(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]))  
             self.controller.SetPoint = config["T_setpoint"]
             self.controller.setWindup(config["windup_limit"]) # windup limits the I term of the output

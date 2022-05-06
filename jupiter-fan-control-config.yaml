@@ -27,7 +27,7 @@ devices:
     slope: 200
     A_setpoint: 200
     B_setpoint: 2000
-    T_setpoint: 90
+    T_setpoint: 75
     Kp: 100
     Ki: 20 
     Kd: 0
