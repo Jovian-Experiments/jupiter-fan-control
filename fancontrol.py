@@ -60,6 +60,7 @@ class FeedForward(object):
         self.A_setpoint = A_setpoint
         self.B_setpoint = B_setpoint
         self.T_setpoint = T_setpoint
+        print("P:{}   I:{}   D:{}".format(Kp,Ki,Kd))
         self.pid = PID(Kp, Ki, Kd)  
         self.pid.SetPoint = T_setpoint
         self.pid.setWindup(windup)
