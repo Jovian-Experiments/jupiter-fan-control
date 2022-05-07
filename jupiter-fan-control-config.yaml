@@ -15,7 +15,7 @@ sensors:
   - hwmon_name: amdgpu
     nice_name: P_APU
     file: power1_average
-    n_sample_avg: 600
+    n_sample_avg: 120
 
 devices:
   - hwmon_name: acpitz
@@ -24,12 +24,11 @@ devices:
     temp_deadzone: 2
     file: temp1_input
     type: feedforward 
-    slope: 200
     A_setpoint: 200
     B_setpoint: 2000
-    T_setpoint: 75
-    Kp: 100
-    Ki: 20 
+    T_setpoint: 80
+    Kp: 150
+    Ki: 3 
     Kd: 0
     windup_limit: 200
 
