@@ -60,7 +60,7 @@ class FeedForward(object):
         self.A_setpoint = A_setpoint
         self.B_setpoint = B_setpoint
         self.T_setpoint = T_setpoint
-        self.pid = PID(Kp, -1 * Ki, Kd)  
+        self.pid = PID(Kp, Ki, Kd)  
         self.pid.SetPoint = T_setpoint
         self.pid.setWindup(int(windup / Ki))
 
@@ -74,7 +74,7 @@ class FeedForward(object):
         pid_output = self.pid.update(temp_input)
         ff_output = self.get_ff_setpoint(power_input)
         self.output = pid_output + ff_output
-        print("FeedForward Controller - FF:{:.0f}    PID: {:.0f} {:.0f} {:.0f} = {:.0f}".format(ff_output, -1 * self.pid.PTerm, -1 * self.pid.Ki * self.pid.ITerm, -1 * self.pid.Kd * self.pid.DTerm, pid_output))
+        print("FeedForward Controller - FF:{:.0f}    PID: {:.0f}  {:.0f}  {:.0f} = {:.0f}".format(ff_output, -1 * self.pid.PTerm, -1 * self.pid.Ki * self.pid.ITerm, -1 * self.pid.Kd * self.pid.DTerm, pid_output))
         return self.output
 
 # fan object controls all jupiter hwmon parameters
