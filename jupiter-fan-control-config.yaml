@@ -26,7 +26,7 @@ devices:
     type: feedforward 
     A_setpoint: 200
     B_setpoint: 2000
-    T_setpoint: 80
+    T_setpoint: 90
     Kp: 150
     Ki: 3 
     Kd: 0
@@ -53,7 +53,7 @@ devices:
     type: pid
     T_setpoint: 60
     Kp: 200
-    Ki: 2 
+    Ki: 20 
     Kd: 0
     windup_limit: 3000
 

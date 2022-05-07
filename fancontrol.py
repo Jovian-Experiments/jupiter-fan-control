@@ -60,9 +60,9 @@ class FeedForward(object):
         self.A_setpoint = A_setpoint
         self.B_setpoint = B_setpoint
         self.T_setpoint = T_setpoint
-        self.pid = PID(Kp, Ki, Kd)  
+        self.pid = PID(Kp, -1 * Ki, Kd)  
         self.pid.SetPoint = T_setpoint
-        self.pid.setWindup(windup)
+        self.pid.setWindup(int(windup / Ki))
 
         self.output = 0
 
@@ -92,7 +92,7 @@ class Fan(object):
         # self.ramp_up_rate = 400
         # self.ramp_down_rate = -50
         self.take_control_from_ec()
-        self.set_speed(0)
+        self.set_speed(3000)
 
     def take_control_from_ec(self):
         with open(self.fan_path + "gain", 'w') as f:
