@@ -51,8 +51,8 @@ devices:
     temp_deadzone: 3
     file: temp1_input
     type: pid
-    T_setpoint: 60
-    Kp: 200
+    T_setpoint: 70
+    Kp: 0
     Ki: 20 
     Kd: 0
     windup_limit: 3000
