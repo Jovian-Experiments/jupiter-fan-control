@@ -62,7 +62,7 @@ class FeedForward(object):
         self.T_setpoint = T_setpoint
         self.pid = PID(Kp, Ki, Kd)  
         self.pid.SetPoint = T_setpoint
-        self.pid.setWindup(int(windup / Ki))
+        self.pid.setWindup(windup)
 
         self.output = 0
 
