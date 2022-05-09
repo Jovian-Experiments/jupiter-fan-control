@@ -55,14 +55,15 @@ class Hybrid(object):
         return self.output
 
 class FeedForward(object):
-    def __init__(self, Kp, Ki, Kd, windup, A_setpoint, B_setpoint, T_setpoint) -> None:
-        windup = 1000
+    def __init__(self, Kp, Ki, Kd, windup, winddown, A_setpoint, B_setpoint, T_setpoint) -> None:
         self.A_setpoint = A_setpoint
         self.B_setpoint = B_setpoint
         self.T_setpoint = T_setpoint
         self.pid = PID(Kp, Ki, Kd)  
         self.pid.SetPoint = T_setpoint
-        self.pid.setWindup(int(windup / Ki))
+        self.pid.setWindup(windup)
+        self.pid.setWinddown(winddown)
+
 
         self.output = 0
 
@@ -176,7 +177,7 @@ class Device(object):
         elif self.type == "hybrid":
             self.controller = Hybrid(float(config["slope"]), float(config["A_setpoint"]), float(config["B_setpoint"]), int(config["T_setpoint"]))
         elif self.type == "feedforward":
-            self.controller = FeedForward(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup_limit"]), float(config["A_setpoint"]), float(config["B_setpoint"]), int(config["T_setpoint"]))
+            self.controller = FeedForward(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup"]), int(config["winddown"]), float(config["A_setpoint"]), float(config["B_setpoint"]), float(config["T_setpoint"]))
         else:
             print("error loading device controller \n")
             exit(1)

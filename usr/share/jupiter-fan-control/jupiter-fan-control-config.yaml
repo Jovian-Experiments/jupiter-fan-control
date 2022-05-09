@@ -21,16 +21,17 @@ devices:
   - hwmon_name: acpitz
     nice_name: CPU
     max_temp: 95
-    temp_deadzone: 2
+    temp_deadzone: 0
     file: temp1_input
     type: feedforward 
     A_setpoint: 200
     B_setpoint: 2000
     T_setpoint: 90
     Kp: 150
-    Ki: 20 
+    Ki: 30 
     Kd: 0
-    windup_limit: 200
+    windup: 100
+    winddown: 40
 
   # - hwmon_name: amdgpu
   #   nice_name: GPU
@@ -47,7 +48,7 @@ devices:
 
   - hwmon_name: nvme
     nice_name: SSD
-    max_temp: 78.0
+    max_temp: 70.0
     temp_deadzone: 3
     file: temp1_input
     type: pid
