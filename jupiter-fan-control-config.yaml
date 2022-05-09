@@ -21,7 +21,7 @@ devices:
   - hwmon_name: acpitz
     nice_name: CPU
     max_temp: 95
-    temp_deadzone: 2
+    temp_deadzone: 0
     file: temp1_input
     type: feedforward 
     A_setpoint: 200
