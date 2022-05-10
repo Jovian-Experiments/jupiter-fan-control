@@ -1,7 +1,7 @@
 # config file for juputer-fan-control.service
 
-loop_interval: 0.1
-control_to_sense_ratio: 10
+loop_interval: 0.2
+control_loop_ratio: 5
 base_hwmon_path: "/sys/class/hwmon/"
 
 fan_hwmon_name: jupiter
@@ -32,7 +32,7 @@ devices:
     Kd: 0
     windup: 100
     winddown: 40
-
+  
   # - hwmon_name: amdgpu
   #   nice_name: GPU
   #   max_temp: 95
@@ -45,6 +45,7 @@ devices:
   #   T_threshold: 45
   #   P_coeff: 120
   #   # quadratic fit (45,1200), (80,3900), (95,5500) 
+  # disabling GPU monitoring as CPU is closely thermally coupled, and has less noise in sensor readings
 
   - hwmon_name: nvme
     nice_name: SSD
@@ -53,10 +54,10 @@ devices:
     file: temp1_input
     type: pid
     T_setpoint: 70
-    Kp: 0
+    Kp: 100
     Ki: 20 
     Kd: 0
-    windup_limit: 3000
+    windup_limit: 500
 
   - hwmon_name: jupiter
     nice_name: CHG
