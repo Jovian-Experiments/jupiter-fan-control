@@ -2,7 +2,8 @@
 
 loop_interval: 0.2
 control_loop_ratio: 5
-base_hwmon_path: "/sys/class/hwmon/"
+base_hwmon_path: /sys/class/hwmon/
+charge_state_path: /sys/class/power_supply/BAT1/status
 
 fan_hwmon_name: jupiter
 fan_min_speed: 10
@@ -58,14 +59,3 @@ devices:
     Ki: 20 
     Kd: 0
     windup_limit: 500
-
-  - hwmon_name: jupiter
-    nice_name: CHG
-    max_temp: 10000
-    temp_deadzone: 0
-    file: curr1_input
-    type: quadratic
-    A: 0
-    B: 0
-    C: 2000
-    T_threshold: 1
