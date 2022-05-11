@@ -2,6 +2,7 @@
 import signal
 import time
 import math
+from xmlrpc.client import Boolean
 import yaml
 import os
 from PID import PID
@@ -61,6 +62,7 @@ class Fan(object):
         '''constructor'''
         self.debug = debug
         self.fan_path = fan_path
+        self.charge_state_path = config["charge_state_path"]
         self.min_speed = config["fan_min_speed"]
         self.threshold_speed = config["fan_threshold_speed"]
         self.max_speed = config["fan_max_speed"]
@@ -68,6 +70,7 @@ class Fan(object):
         self.ec_ramp_rate = config["ec_ramp_rate"]
         self.fc_speed = 0
         self.measured_speed = 0
+        self.charge_state = False
         self.take_control_from_ec()
         self.set_speed(3000)
 
@@ -94,6 +97,16 @@ class Fan(object):
         with open(self.fan_path + "fan1_input", 'r', encoding="utf8") as f:
             self.measured_speed = int(f.read().strip())
         return self.measured_speed
+
+    def get_charge_state(self) -> Boolean:
+        '''updates min rpm depending on charge state'''
+        with open(self.charge_state_path, 'r', encoding="utf8") as f:
+            state = f.read().strip()
+            print(state)
+        if state == "Charging":
+            self.min_speed = self.threshold_speed
+        else:
+            self.min_speed = 10 # update this to pull from yaml
 
     def set_speed(self, speed) -> None:
         '''sets a new target speed'''
@@ -137,7 +150,6 @@ class Device(object):
             print("error loading device controller \n")
             exit(1)
 
-    # 
     def get_temp(self) -> None:
         '''updates temperatures'''
         with open(self.file_path, 'r', encoding="utf8") as f:
@@ -166,7 +178,7 @@ class Device(object):
         return self.control_output
 
 class Sensor(object):
-    '''power sensor for measuring APU wattage'''
+    '''sensor for measuring non-temperature values'''
     def __init__(self, base_path, config, debug = False) -> None:
         self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
         self.debug = debug
@@ -262,6 +274,8 @@ class FanController(object):
             # read device temps and power sensor
             for _ in range(self.control_loop_ratio):
                 self.loop_read_sensors()
+            # read charge state
+            self.fan.get_charge_state()
             # get device controller outputs
             for device in self.devices:
                 device.get_output(device.avg_control_temp, self.power_sensor.avg_value)
