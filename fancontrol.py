@@ -102,18 +102,22 @@ class Fan(object):
         '''updates min rpm depending on charge state'''
         with open(self.charge_state_path, 'r', encoding="utf8") as f:
             state = f.read().strip()
-            print(state)
         if state == "Charging":
-            self.min_speed = self.threshold_speed
+            self.charge_state = True
         else:
-            self.min_speed = 10 # update this to pull from yaml
+            self.charge_state = False
+        print(f"charge state: {state}, interpret as {self.charge_state}")
+        return self.charge_state
 
     def set_speed(self, speed) -> None:
         '''sets a new target speed'''
         if speed > self.max_speed:
             speed = self.max_speed
         if speed < self.threshold_speed:
-            speed = self.min_speed
+            if self.charge_state:
+                speed = self.threshold_speed
+            else:
+                speed = self.min_speed
         self.fc_speed = speed
         with open(self.fan_path + "fan1_target", 'w', encoding="utf8") as f:
             f.write(str(int(self.fc_speed)))
