@@ -8,48 +8,57 @@ from PID import PID
 
 # quadratic function RPM = AT^2 + BT + C
 class Quadratic(object):
-    def __init__(self, A, B, C, T_threshold):
+    '''quadratic function controller'''
+    def __init__(self, A, B, C, T_threshold) -> None:
+        '''constructor'''
         self.A = A
         self.B = B
         self.C = C
         self.T_threshold = T_threshold
         self.output = 0
     
-    def update(self, temp_input, _):
+    def update(self, temp_input, _) -> int:
+        '''update output'''
         if temp_input < self.T_threshold:
             return 0
         self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
         return self.output
 
-# RPM predicted by APU power is fed forward + PID output stage
+
 class FeedForward(object):
-    def __init__(self, Kp, Ki, Kd, windup, winddown, A_setpoint, B_setpoint, T_setpoint) -> None:
-        self.A_setpoint = A_setpoint
-        self.B_setpoint = B_setpoint
-        self.T_setpoint = T_setpoint
+    '''RPM predicted by APU power is fed forward + PID output stage'''
+    def __init__(self, Kp, Ki, Kd, windup, winddown, a_setpoint, b_setpoint, temp_setpoint) -> None:
+        '''constructor'''
+        self.a_setpoint = a_setpoint
+        self.b_setpoint = b_setpoint
+        self.temp_setpoint = temp_setpoint
         self.pid = PID(Kp, Ki, Kd)  
-        self.pid.SetPoint = T_setpoint
+        self.pid.SetPoint = temp_setpoint
         self.pid.setWindup(windup)
         self.pid.setWinddown(winddown)
         self.output = 0
 
-    def print_ff_state(self, ff_output, pid_output):
-        print("FeedForward Controller - FF:{:.0f}    PID: {:.0f}  {:.0f}  {:.0f} = {:.0f}".format(ff_output, -1 * self.pid.PTerm, -1 * self.pid.Ki * self.pid.ITerm, -1 * self.pid.Kd * self.pid.DTerm, pid_output))
+    def print_ff_state(self, ff_output, pid_output) -> str:
+        '''prints state variables of FF and PID, helpful for debug'''
+        print(f"FeedForward Controller - FF:{ff_output:.0f}    PID: {-1 * self.pid.PTerm:.0f}  {-1 * self.pid.Ki * self.pid.ITerm:.0f}  {-1 * self.pid.Kd * self.pid.DTerm:.0f} = {pid_output:.0f}")
 
-    def get_ff_setpoint(self, power_input):
-        rpm_setpoint = self.A_setpoint * power_input + self.B_setpoint
+    def get_ff_setpoint(self, power_input) -> int:
+        '''returns the feed forward portion of the controller output'''
+        rpm_setpoint = int(self.a_setpoint * power_input + self.b_setpoint)
         return rpm_setpoint
 
-    def update(self, temp_input, power_input):
+    def update(self, temp_input, power_input) -> int:
+        '''run controller to update output'''
         pid_output = self.pid.update(temp_input)
         ff_output = self.get_ff_setpoint(power_input)
         self.output = int(pid_output + ff_output)
         # self.print_ff_state(ff_output, pid_output)
         return self.output
 
-# fan object controls all jupiter hwmon parameters
 class Fan(object):
+    '''fan object controls all jupiter hwmon parameters'''
     def __init__(self, fan_path, config, debug = False) -> None:
+        '''constructor'''
         self.debug = debug
         self.fan_path = fan_path
         self.min_speed = config["fan_min_speed"]
@@ -62,40 +71,44 @@ class Fan(object):
         self.take_control_from_ec()
         self.set_speed(3000)
 
-    # take over fan control from ec mcu
-    def take_control_from_ec(self):
-        with open(self.fan_path + "gain", 'w') as f:
+    def take_control_from_ec(self) -> None:
+        '''take over fan control from ec mcu'''
+        with open(self.fan_path + "gain", 'w', encoding="utf8") as f:
             f.write(str(self.gain))
-        with open(self.fan_path + "ramp_rate", 'w') as f:
+        with open(self.fan_path + "ramp_rate", 'w', encoding="utf8") as f:
             f.write(str(self.ec_ramp_rate))
-        with open(self.fan_path + "recalculate", 'w') as f:
+        with open(self.fan_path + "recalculate", 'w', encoding="utf8") as f:
             f.write(str(1))
 
-    def return_to_ec_control(self):
-        with open(self.fan_path + "gain", 'w') as f:
+    def return_to_ec_control(self) -> None:
+        '''reset EC to generate fan values internally'''
+        with open(self.fan_path + "gain", 'w', encoding="utf8") as f:
             f.write(str(10))
-        with open(self.fan_path + "ramp_rate", 'w') as f:
+        with open(self.fan_path + "ramp_rate", 'w', encoding="utf8") as f:
             f.write(str(20))
-        with open(self.fan_path + "recalculate", 'w') as f:
+        with open(self.fan_path + "recalculate", 'w', encoding="utf8") as f:
             f.write(str(0))
 
-    def get_speed(self):
-        with open(self.fan_path + "fan1_input", 'r') as f:
+    def get_speed(self) -> int:
+        '''returns the measured (real) fan speed'''
+        with open(self.fan_path + "fan1_input", 'r', encoding="utf8") as f:
             self.measured_speed = int(f.read().strip())
         return self.measured_speed
 
-    def set_speed(self, speed):
+    def set_speed(self, speed) -> None:
+        '''sets a new target speed'''
         if speed > self.max_speed:
             speed = self.max_speed
         if speed < self.threshold_speed:
             speed = self.min_speed
         self.fc_speed = speed
-        with open(self.fan_path + "fan1_target", 'w') as f:
+        with open(self.fan_path + "fan1_target", 'w', encoding="utf8") as f:
             f.write(str(int(self.fc_speed)))
 
-# devices are sources of heat - CPU, GPU, etc.
 class Device(object):
+    '''devices are sources of heat - CPU, GPU, etc.'''
     def __init__(self, base_path, config, fan_max_speed, n_sample_avg, debug = False) -> None:
+        '''constructor'''
         self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
         self.debug = debug
         self.fan_max_speed = fan_max_speed
@@ -124,9 +137,10 @@ class Device(object):
             print("error loading device controller \n")
             exit(1)
 
-    # updates temperatures
+    # 
     def get_temp(self) -> None:
-        with open(self.file_path, 'r') as f:
+        '''updates temperatures'''
+        with open(self.file_path, 'r', encoding="utf8") as f:
             self.temp = int(f.read().strip()) / 1000
         # only update the control temp if it's outside temp_deadzone
         if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
@@ -134,6 +148,7 @@ class Device(object):
         return self.control_temp
 
     def get_avg_temp(self):
+        '''updates temperature list + generates average value'''
         self.control_temps.append(self.get_temp())
         if self.buffer_full:
             self.control_temps.pop(0)
@@ -142,15 +157,16 @@ class Device(object):
         self.avg_control_temp = math.fsum(self.control_temps) / len(self.control_temps)
         return self.avg_control_temp
 
-    def get_output(self, temp_input, power_input):
+    def get_output(self, temp_input, power_input) -> int:
+        '''updates the device controller and returns bounded output'''
         self.controller.update(temp_input, power_input)
         self.control_output = max(self.controller.output, 0)
         if(temp_input > self.max_temp):
             self.control_output = self.fan_max_speed
         return self.control_output
 
-# testing variable PID setpoints
 class Sensor(object):
+    '''power sensor for measuring APU wattage'''
     def __init__(self, base_path, config, debug = False) -> None:
         self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
         self.debug = debug
@@ -161,12 +177,14 @@ class Sensor(object):
         self.buffer_full = False
         self.values = []
 
-    def get_value(self):
-        with open(self.file_path, 'r') as f:
+    def get_value(self) -> float:
+        '''returns instantaneous value'''
+        with open(self.file_path, 'r', encoding='utf-8') as f:
             self.value = int(f.read().strip()) / 1000000
         return self.value
     
     def get_avg_value(self) -> float:
+        '''returns average value'''
         self.values.append(self.get_value())
         if self.buffer_full:
             self.values.pop(0)
@@ -175,23 +193,24 @@ class Sensor(object):
         self.avg_value = math.fsum(self.values) / len(self.values)
         return self.avg_value
 
-# helper function to find correct hwmon* path for a given device name
-def get_full_path(base_path, name):
+def get_full_path(base_path, name) -> str:
+    '''helper function to find correct hwmon* path for a given device name'''
     for directory in os.listdir(base_path):
         full_path = base_path + directory + '/'
-        test_name = open(full_path + "name").read().strip()
+        test_name = open(full_path + "name", encoding="utf8").read().strip()
         if test_name == name:
             return full_path
-    print("failed to find device {}".format(name))
+    print(f"failed to find device {name}")
 
-# main FanController class
 class FanController(object):
+    '''main FanController class'''
     def __init__(self, debug, config_file):
         self.debug = debug
 
         # read in config yaml file
-        if debug: print("reading config file")
-        with open(config_file, "r") as f:
+        if debug:
+            print("reading config file")
+        with open(config_file, "r", encoding="utf8") as f:
             try:
                 self.config = yaml.safe_load(f)
             except yaml.YAMLError as exc:
@@ -216,15 +235,16 @@ class FanController(object):
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
 
-    # pretty print all device values, temp source, and output
     def print_single(self, source_name):
+        '''pretty print all device values, temp source, and output'''
         for device in self.devices:
-                print("{}: {:.1f}/{:.0f}  ".format(device.nice_name, device.temp, device.control_output), end = '')
+                print(f"{device.nice_name}: {device.temp:.1f}/{device.control_output:.0f}  ", end = '')
                 #print("{}: {}  ".format(device.nice_name, device.temp), end = '')
-        print("{}: {:.1f}/{:.1f}  ".format(self.power_sensor.nice_name, self.power_sensor.value, self.power_sensor.avg_value), end = '')
-        print("Fan[{}]: {}/{}".format(source_name, int(self.fan.fc_speed), self.fan.measured_speed))
+        print(f"{self.power_sensor.nice_name}: {self.power_sensor.value:.1f}/{self.power_sensor.avg_value:.1f}  ", end = '')
+        print(f"Fan[{source_name}]: {int(self.fan.fc_speed)}/{self.fan.measured_speed}")
 
     def loop_read_sensors(self):
+        '''internal loop to measure device temps and sensor value'''
         start_time = time.time()
         self.power_sensor.get_avg_value()
         for device in self.devices:
@@ -233,8 +253,8 @@ class FanController(object):
         if sleep_time > 0:
             time.sleep(sleep_time)
 
-    # automatic control loop
     def loop_control(self):
+        '''main control loop'''
         while True:
             fan_error = abs(self.fan.fc_speed - self.fan.get_speed())
             if fan_error > 500:
@@ -253,20 +273,21 @@ class FanController(object):
             self.print_single(source_name)
 
     def on_exit(self, signum, frame):
+        '''exit handler'''
         self.fan.return_to_ec_control()
         print("returning fan to EC control loop")
         exit()
 
-# main loop
+# main
 if __name__ == '__main__':
     print('jupiter-fan-control starting up ...')
 
     # specify config file path
     # config_file_path = os.getcwd() + "/config.yaml"
-    config_file_path = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
+    CONFIG_FILE_PATH = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
 
     # initialize controller
-    controller = FanController(debug = False, config_file = config_file_path)
+    controller = FanController(debug = False, config_file = CONFIG_FILE_PATH)
 
     # start main loop
     controller.loop_control()
