@@ -106,7 +106,6 @@ class Fan(object):
             self.charge_state = True
         else:
             self.charge_state = False
-        print(f"charge state: {state}, interpret as {self.charge_state}")
         return self.charge_state
 
     def set_speed(self, speed) -> None:
