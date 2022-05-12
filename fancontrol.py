@@ -53,7 +53,7 @@ class FeedForward(object):
         pid_output = self.pid.update(temp_input)
         ff_output = self.get_ff_setpoint(power_input)
         self.output = int(pid_output + ff_output)
-        # self.print_ff_state(ff_output, pid_output)
+        self.print_ff_state(ff_output, pid_output)
         return self.output
 
 class Fan(object):
@@ -106,7 +106,6 @@ class Fan(object):
             self.charge_state = True
         else:
             self.charge_state = False
-        print(f"charge state: {state}, interpret as {self.charge_state}")
         return self.charge_state
 
     def set_speed(self, speed) -> None:
