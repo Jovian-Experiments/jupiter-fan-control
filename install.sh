@@ -1,5 +1,4 @@
 #!/bin/bash
-
 echo "packaging"
 makepkg -scif
 echo "restarting service"
