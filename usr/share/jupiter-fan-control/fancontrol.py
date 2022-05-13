@@ -71,6 +71,7 @@ class Fan(object):
         self.fc_speed = 0
         self.measured_speed = 0
         self.charge_state = False
+        self.charge_min_speed = 2000
         self.take_control_from_ec()
         self.set_speed(3000)
 
@@ -112,11 +113,12 @@ class Fan(object):
         '''sets a new target speed'''
         if speed > self.max_speed:
             speed = self.max_speed
-        if speed < self.threshold_speed:
-            if self.charge_state:
-                speed = self.threshold_speed
-            else:
-                speed = self.min_speed
+        elif self.charge_state:
+            if speed < self.charge_min_speed:
+                speed = self.charge_min_speed
+        elif speed < self.threshold_speed:
+            speed = self.min_speed
+            
         self.fc_speed = speed
         with open(self.fan_path + "fan1_target", 'w', encoding="utf8") as f:
             f.write(str(int(self.fc_speed)))
