@@ -78,7 +78,7 @@ class Fan(object):
     def bios_compatibility_check(self) -> None:
         """returns True for bios versions >= 106, false for earlier versions"""
         std_bios = False
-        code = os.system("dmidecode -s bios_version")
+        code = os.system("dmidecode -s bios-version")
         print(code)
         return std_bios
 
@@ -296,7 +296,6 @@ class FanController(object):
                 self.loop_read_sensors()
             # read charge state
             self.fan.get_charge_state()
-            # get device controller outputs
             for device in self.devices:
                 device.get_output(device.avg_control_temp, self.power_sensor.avg_value)
             max_output = max(device.control_output for device in self.devices)
