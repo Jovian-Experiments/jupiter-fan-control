@@ -1,10 +1,10 @@
 #!/usr/bin/python -u
 import signal
+import os
 import time
 import math
 from xmlrpc.client import Boolean
 import yaml
-import os
 from PID import PID
 
 # quadratic function RPM = AT^2 + BT + C
@@ -71,26 +71,41 @@ class Fan(object):
         self.measured_speed = 0
         self.charge_state = False
         self.charge_min_speed = 2000
+        self.has_std_bios = self.bios_compatibility_check()
         self.take_control_from_ec()
         self.set_speed(3000)
+    
+    def bios_compatibility_check(self) -> None:
+        """returns True for bios versions >= 106, false for earlier versions"""
+        std_bios = False
+        code = os.system("dmidecode -s bios_version")
+        print(code)
+        return std_bios
 
     def take_control_from_ec(self) -> None:
         '''take over fan control from ec mcu'''
-        with open(self.fan_path + "gain", 'w', encoding="utf8") as f:
-            f.write(str(self.gain))
-        with open(self.fan_path + "ramp_rate", 'w', encoding="utf8") as f:
-            f.write(str(self.ec_ramp_rate))
-        with open(self.fan_path + "recalculate", 'w', encoding="utf8") as f:
-            f.write(str(1))
+        if self.has_std_bios:
+            return
+        else:
+            with open(self.fan_path + "gain", 'w', encoding="utf8") as f:
+                f.write(str(self.gain))
+            with open(self.fan_path + "ramp_rate", 'w', encoding="utf8") as f:
+                f.write(str(self.ec_ramp_rate))
+            with open(self.fan_path + "recalculate", 'w', encoding="utf8") as f:
+                f.write(str(1))
 
     def return_to_ec_control(self) -> None:
         '''reset EC to generate fan values internally'''
-        with open(self.fan_path + "gain", 'w', encoding="utf8") as f:
-            f.write(str(10))
-        with open(self.fan_path + "ramp_rate", 'w', encoding="utf8") as f:
-            f.write(str(20))
-        with open(self.fan_path + "recalculate", 'w', encoding="utf8") as f:
-            f.write(str(0))
+        if self.has_std_bios:
+            with open(self.fan_path + "fan1_target", 'w', encoding="utf8") as f:
+                f.write(str(int(0)))
+        else:
+            with open(self.fan_path + "gain", 'w', encoding="utf8") as f:
+                f.write(str(10))
+            with open(self.fan_path + "ramp_rate", 'w', encoding="utf8") as f:
+                f.write(str(20))
+            with open(self.fan_path + "recalculate", 'w', encoding="utf8") as f:
+                f.write(str(0))
 
     def get_speed(self) -> int:
         '''returns the measured (real) fan speed'''
@@ -222,6 +237,7 @@ class FanController(object):
     '''main FanController class'''
     def __init__(self, debug, config_file):
         self.debug = debug
+        self.VERSION = '20220517.1'
 
         # read in config yaml file
         if debug:
@@ -298,7 +314,6 @@ class FanController(object):
 
 # main
 if __name__ == '__main__':
-    print('jupiter-fan-control starting up ...')
 
     # specify config file path
     # config_file_path = os.getcwd() + "/config.yaml"
@@ -306,8 +321,9 @@ if __name__ == '__main__':
 
     # initialize controller
     controller = FanController(debug = False, config_file = CONFIG_FILE_PATH)
+    
+    print(f"jupiter-fan-control version {controller.VERSION} starting up ...")
 
     # start main loop
     controller.loop_control()
     
-    print('jupiter-fan-control startup complete')
