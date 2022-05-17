@@ -1,4 +1,5 @@
 #!/usr/bin/python -u
+from dis import dis
 import signal
 import os
 import subprocess
@@ -79,9 +80,17 @@ class Fan(object):
     def bios_compatibility_check(self) -> None:
         """returns True for bios versions >= 106, false for earlier versions"""
         std_bios = False
-        code = subprocess.check_output(["dmidecode", "-s", "bios-version"])
+        code = subprocess.check_output(["dmidecode", "-s", "bios-version"]) # b'F7A0104T06\n'
+        # disallowed_chars = "b\'FA\\n\'"
+        # for char in disallowed_chars:
+        #     code = code.replace(char, '')
+
+        print(code) # b'F7A0104T06\n'
+        code = code[5:9]
         print(code)
-        return std_bios
+
+        if int(code) >= 106:
+            return std_bios
 
     def take_control_from_ec(self) -> None:
         '''take over fan control from ec mcu'''
