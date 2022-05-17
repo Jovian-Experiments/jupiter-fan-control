@@ -1,6 +1,7 @@
 #!/usr/bin/python -u
 import signal
 import os
+import subprocess
 import time
 import math
 from xmlrpc.client import Boolean
@@ -78,7 +79,7 @@ class Fan(object):
     def bios_compatibility_check(self) -> None:
         """returns True for bios versions >= 106, false for earlier versions"""
         std_bios = False
-        code = os.system("dmidecode -s bios-version")
+        code = subprocess.check_output(["dmidecode", "-s", "bios-version"])
         print(code)
         return std_bios
 
