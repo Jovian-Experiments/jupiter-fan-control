@@ -25,7 +25,6 @@ class Quadratic(object):
         self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
         return self.output
 
-
 class FeedForward(object):
     '''RPM predicted by APU power is fed forward + PID output stage'''
     def __init__(self, Kp, Ki, Kd, windup, winddown, a_setpoint, b_setpoint, temp_setpoint) -> None:
