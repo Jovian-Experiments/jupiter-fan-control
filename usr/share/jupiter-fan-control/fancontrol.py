@@ -1,16 +1,15 @@
 #!/usr/bin/python -u
-from dis import dis
+"""jupiter-fan-controller"""
 import signal
 import os
 import subprocess
 import time
 import math
-from xmlrpc.client import Boolean
 import yaml
 from PID import PID
 
 # quadratic function RPM = AT^2 + BT + C
-class Quadratic(object):
+class Quadratic():
     '''quadratic function controller'''
     def __init__(self, A, B, C, T_threshold) -> None:
         '''constructor'''
@@ -27,7 +26,7 @@ class Quadratic(object):
         self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
         return self.output
 
-class FeedForward(object):
+class FeedForward():
     '''RPM predicted by APU power is fed forward + PID output stage'''
     def __init__(self, Kp, Ki, Kd, windup, winddown, a_setpoint, b_setpoint, temp_setpoint) -> None:
         '''constructor'''
@@ -57,7 +56,7 @@ class FeedForward(object):
         # self.print_ff_state(ff_output, pid_output)
         return self.output
 
-class Fan(object):
+class Fan():
     '''fan object controls all jupiter hwmon parameters'''
     def __init__(self, fan_path, config, debug = False) -> None:
         '''constructor'''
@@ -76,21 +75,17 @@ class Fan(object):
         self.has_std_bios = self.bios_compatibility_check()
         self.take_control_from_ec()
         self.set_speed(3000)
-    
-    def bios_compatibility_check(self) -> None:
+
+    @staticmethod
+    def bios_compatibility_check() -> bool:
         """returns True for bios versions >= 106, false for earlier versions"""
-        std_bios = False
-        code = subprocess.check_output(["dmidecode", "-s", "bios-version"]) # b'F7A0104T06\n'
-        # disallowed_chars = "b\'FA\\n\'"
-        # for char in disallowed_chars:
-        #     code = code.replace(char, '')
+        version = subprocess.check_output(["dmidecode", "-s", "bios-version"]) # b'F7A0104T06\n'
+        version = int(version[3:7])
 
-        print(code) # b'F7A0104T06\n'
-        code = code[5:9]
-        print(code)
-
-        if int(code) >= 106:
-            return std_bios
+        if version >= 106:
+            return True
+        else:
+            return False
 
     def take_control_from_ec(self) -> None:
         '''take over fan control from ec mcu'''
@@ -123,7 +118,7 @@ class Fan(object):
             self.measured_speed = int(f.read().strip())
         return self.measured_speed
 
-    def get_charge_state(self) -> Boolean:
+    def get_charge_state(self) -> bool:
         '''updates min rpm depending on charge state'''
         with open(self.charge_state_path, 'r', encoding="utf8") as f:
             state = f.read().strip()
@@ -147,7 +142,7 @@ class Fan(object):
         with open(self.fan_path + "fan1_target", 'w', encoding="utf8") as f:
             f.write(str(int(self.fc_speed)))
 
-class Device(object):
+class Device():
     '''devices are sources of heat - CPU, GPU, etc.'''
     def __init__(self, base_path, config, fan_max_speed, n_sample_avg, debug = False) -> None:
         '''constructor'''
@@ -206,7 +201,7 @@ class Device(object):
             self.control_output = self.fan_max_speed
         return self.control_output
 
-class Sensor(object):
+class Sensor():
     '''sensor for measuring non-temperature values'''
     def __init__(self, base_path, config, debug = False) -> None:
         self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
@@ -243,7 +238,7 @@ def get_full_path(base_path, name) -> str:
             return full_path
     print(f"failed to find device {name}")
 
-class FanController(object):
+class FanController():
     '''main FanController class'''
     def __init__(self, debug, config_file):
         self.debug = debug
