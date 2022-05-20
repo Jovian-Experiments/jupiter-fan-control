@@ -12,50 +12,50 @@ fan_max_speed: 7300
 fan_gain: 10
 ec_ramp_rate: 10
 
-sensors:
-  - hwmon_name: amdgpu
-    nice_name: P_APU
-    file: power1_average
-    n_sample_avg: 120
-
 devices:
   - hwmon_name: acpitz
     nice_name: CPU
-    max_temp: 95
-    temp_deadzone: 0
+    max_temp: 90
+    temp_deadzone: 2
     file: temp1_input
-    type: feedforward 
-    A_setpoint: 200
-    B_setpoint: 2500
-    T_setpoint: 83
-    Kp: 120
-    Ki: 30 
-    Kd: 0
-    windup: 100
-    winddown: 40
-  
-  # - hwmon_name: amdgpu
-  #   nice_name: GPU
-  #   max_temp: 95
-  #   temp_deadzone: 2
-  #   file: temp1_input
-  #   type: quadratic
-  #   A: .59
-  #   B: 3.33
-  #   C: -145.7
-  #   T_threshold: 45
-  #   P_coeff: 120
-  #   # quadratic fit (45,1200), (80,3900), (95,5500) 
-  # disabling GPU monitoring as CPU is closely thermally coupled, and has less noise in sensor readings
+    type: quadratic
+    A: 2.286
+    B: -188.6
+    C: 5457
+    T_threshold: 55
+    # quadratic fit {{55, 2000}, {80, 5000}, {90, 7000}}
+
+  - hwmon_name: amdgpu
+    nice_name: GPU
+    max_temp: 90
+    temp_deadzone: 2
+    file: temp1_input
+    type: quadratic
+    A: 2.286
+    B: -188.6
+    C: 5457
+    T_threshold: 55
+    # quadratic fit {{55, 2000}, {80, 5000}, {90, 7000}}
 
   - hwmon_name: nvme
     nice_name: SSD
-    max_temp: 85.0
+    max_temp: 70.0
     temp_deadzone: 3
     file: temp1_input
     type: pid
-    T_setpoint: 70
-    Kp: 100
-    Ki: 20 
+    bandwidth: 25
+    Kp: 4000
+    Ki: 20
     Kd: 0
-    windup_limit: 500
+    windup: 50
+
+  - hwmon_name: jupiter
+    nice_name: CHG
+    max_temp: 10000
+    temp_deadzone: 0
+    file: curr1_input
+    type: quadratic
+    A: 0
+    B: 0
+    C: 2000
+    T_threshold: 1
