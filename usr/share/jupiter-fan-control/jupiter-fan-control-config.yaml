@@ -43,11 +43,11 @@ devices:
     temp_deadzone: 3
     file: temp1_input
     type: pid
-    bandwidth: 25
-    Kp: 4000
-    Ki: 20
+    T_setpoint: 70
+    Kp: 0
+    Ki: 20 
     Kd: 0
-    windup: 50
+    windup_limit: 3000
 
   - hwmon_name: jupiter
     nice_name: CHG
