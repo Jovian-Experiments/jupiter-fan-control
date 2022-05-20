@@ -1,7 +1,7 @@
 # Maintainer: Adam Weld <weld@valvesoftware.com>
 
 pkgname=jupiter-fan-control
-pkgver=0.0.2
+pkgver=0.0.3
 pkgrel=1
 arch=('any')
 license=('GPLv3')

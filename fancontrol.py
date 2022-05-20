@@ -1,14 +1,16 @@
 #!/usr/bin/python -u
+"""jupiter-fan-controller"""
 import signal
+import os
+import sys
+import subprocess
 import time
 import math
-from xmlrpc.client import Boolean
 import yaml
-import os
 from PID import PID
 
 # quadratic function RPM = AT^2 + BT + C
-class Quadratic(object):
+class Quadratic():
     '''quadratic function controller'''
     def __init__(self, A, B, C, T_threshold) -> None:
         '''constructor'''
@@ -25,15 +27,14 @@ class Quadratic(object):
         self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
         return self.output
 
-
-class FeedForward(object):
+class FeedForward():
     '''RPM predicted by APU power is fed forward + PID output stage'''
-    def __init__(self, Kp, Ki, Kd, windup, winddown, a_setpoint, b_setpoint, temp_setpoint) -> None:
+    def __init__(self, Kp, Ki, Kd, windup, winddown, a_ff, b_ff, temp_setpoint) -> None:
         '''constructor'''
-        self.a_setpoint = a_setpoint
-        self.b_setpoint = b_setpoint
+        self.a_ff = a_ff
+        self.b_ff = b_ff
         self.temp_setpoint = temp_setpoint
-        self.pid = PID(Kp, Ki, Kd)  
+        self.pid = PID(Kp, Ki, Kd)
         self.pid.SetPoint = temp_setpoint
         self.pid.setWindup(windup)
         self.pid.setWinddown(winddown)
@@ -45,7 +46,7 @@ class FeedForward(object):
 
     def get_ff_setpoint(self, power_input) -> int:
         '''returns the feed forward portion of the controller output'''
-        rpm_setpoint = int(self.a_setpoint * power_input + self.b_setpoint)
+        rpm_setpoint = int(self.a_ff * power_input + self.b_ff)
         return rpm_setpoint
 
     def update(self, temp_input, power_input) -> int:
@@ -56,7 +57,45 @@ class FeedForward(object):
         # self.print_ff_state(ff_output, pid_output)
         return self.output
 
-class Fan(object):
+class FeedForwardMin():
+    '''FF with an additional min curve'''
+    def __init__(self, Kp, Ki, Kd, windup, winddown, a_ff, b_ff, temp_setpoint, a_min, b_min) -> None:
+        '''constructor'''
+        self.a_ff = a_ff
+        self.b_ff = b_ff
+        self.a_min = a_min
+        self.b_min = b_min
+        self.temp_setpoint = temp_setpoint
+        self.pid = PID(Kp, Ki, Kd)
+        self.pid.SetPoint = temp_setpoint
+        self.pid.setWindup(windup)
+        self.pid.setWinddown(winddown)
+        self.output = 0
+
+    def print_ff_state(self, ff_output, pid_output, min_setpoint) -> str:
+        '''prints state variables of FF and PID, helpful for debug'''
+        print(f"FeedForward Controller - Min:{min_setpoint}    FF:{ff_output:.0f}    PID: {-1 * self.pid.PTerm:.0f}  {-1 * self.pid.Ki * self.pid.ITerm:.0f}  {-1 * self.pid.Kd * self.pid.DTerm:.0f} = {pid_output:.0f}")
+
+    def get_ff_setpoint(self, power_input) -> int:
+        '''returns the feed forward portion of the controller output'''
+        rpm_setpoint = int(self.a_ff * power_input + self.b_ff)
+        return rpm_setpoint
+
+    def get_min_setpoint(self, temp_input) -> int:
+        '''returns a minimum rpm speed for the given temperature'''
+        rpm_setpoint =  int(self.a_min * temp_input + self.b_min)
+        return rpm_setpoint
+
+    def update(self, temp_input, power_input) -> int:
+        '''run controller to update output'''
+        pid_output = int(self.pid.update(temp_input))
+        ff_output = self.get_ff_setpoint(power_input)
+        min_setpoint = self.get_min_setpoint(temp_input)
+        self.output = max(min_setpoint,(pid_output + ff_output))
+        self.print_ff_state(ff_output, pid_output, min_setpoint)
+        return self.output
+
+class Fan():
     '''fan object controls all jupiter hwmon parameters'''
     def __init__(self, fan_path, config, debug = False) -> None:
         '''constructor'''
@@ -71,26 +110,46 @@ class Fan(object):
         self.fc_speed = 0
         self.measured_speed = 0
         self.charge_state = False
+        self.charge_min_speed = 2000
+        self.has_std_bios = self.bios_compatibility_check()
         self.take_control_from_ec()
         self.set_speed(3000)
 
+    @staticmethod
+    def bios_compatibility_check() -> bool:
+        """returns True for bios versions >= 106, false for earlier versions"""
+        version = subprocess.check_output(["dmidecode", "-s", "bios-version"]) # b'F7A0104T06\n'
+        version = int(version[3:7])
+
+        if version >= 106:
+            return True
+        else:
+            return False
+
     def take_control_from_ec(self) -> None:
         '''take over fan control from ec mcu'''
-        with open(self.fan_path + "gain", 'w', encoding="utf8") as f:
-            f.write(str(self.gain))
-        with open(self.fan_path + "ramp_rate", 'w', encoding="utf8") as f:
-            f.write(str(self.ec_ramp_rate))
-        with open(self.fan_path + "recalculate", 'w', encoding="utf8") as f:
-            f.write(str(1))
+        if self.has_std_bios:
+            return
+        else:
+            with open(self.fan_path + "gain", 'w', encoding="utf8") as f:
+                f.write(str(self.gain))
+            with open(self.fan_path + "ramp_rate", 'w', encoding="utf8") as f:
+                f.write(str(self.ec_ramp_rate))
+            with open(self.fan_path + "recalculate", 'w', encoding="utf8") as f:
+                f.write(str(1))
 
     def return_to_ec_control(self) -> None:
         '''reset EC to generate fan values internally'''
-        with open(self.fan_path + "gain", 'w', encoding="utf8") as f:
-            f.write(str(10))
-        with open(self.fan_path + "ramp_rate", 'w', encoding="utf8") as f:
-            f.write(str(20))
-        with open(self.fan_path + "recalculate", 'w', encoding="utf8") as f:
-            f.write(str(0))
+        if self.has_std_bios:
+            with open(self.fan_path + "fan1_target", 'w', encoding="utf8") as f:
+                f.write(str(int(0)))
+        else:
+            with open(self.fan_path + "gain", 'w', encoding="utf8") as f:
+                f.write(str(10))
+            with open(self.fan_path + "ramp_rate", 'w', encoding="utf8") as f:
+                f.write(str(20))
+            with open(self.fan_path + "recalculate", 'w', encoding="utf8") as f:
+                f.write(str(0))
 
     def get_speed(self) -> int:
         '''returns the measured (real) fan speed'''
@@ -98,7 +157,7 @@ class Fan(object):
             self.measured_speed = int(f.read().strip())
         return self.measured_speed
 
-    def get_charge_state(self) -> Boolean:
+    def get_charge_state(self) -> bool:
         '''updates min rpm depending on charge state'''
         with open(self.charge_state_path, 'r', encoding="utf8") as f:
             state = f.read().strip()
@@ -106,23 +165,23 @@ class Fan(object):
             self.charge_state = True
         else:
             self.charge_state = False
-        print(f"charge state: {state}, interpret as {self.charge_state}")
         return self.charge_state
 
     def set_speed(self, speed) -> None:
         '''sets a new target speed'''
         if speed > self.max_speed:
             speed = self.max_speed
-        if speed < self.threshold_speed:
-            if self.charge_state:
-                speed = self.threshold_speed
-            else:
-                speed = self.min_speed
+        elif self.charge_state:
+            if speed < self.charge_min_speed:
+                speed = self.charge_min_speed
+        elif speed < self.threshold_speed:
+            speed = self.min_speed
+            
         self.fc_speed = speed
         with open(self.fan_path + "fan1_target", 'w', encoding="utf8") as f:
             f.write(str(int(self.fc_speed)))
 
-class Device(object):
+class Device():
     '''devices are sources of heat - CPU, GPU, etc.'''
     def __init__(self, base_path, config, fan_max_speed, n_sample_avg, debug = False) -> None:
         '''constructor'''
@@ -149,7 +208,9 @@ class Device(object):
         elif self.type ==  "quadratic":
             self.controller = Quadratic(float(config["A"]), float(config["B"]), float(config["C"]), float(config["T_threshold"]))
         elif self.type == "feedforward":
-            self.controller = FeedForward(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup"]), int(config["winddown"]), float(config["A_setpoint"]), float(config["B_setpoint"]), float(config["T_setpoint"]))
+            self.controller = FeedForward(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup"]), int(config["winddown"]), float(config["A_ff"]), float(config["B_ff"]), float(config["T_setpoint"]))
+        elif self.type == "ffmin":
+            self.controller = FeedForwardMin(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup"]), int(config["winddown"]), float(config["A_ff"]), float(config["B_ff"]), float(config["T_setpoint"]), float(config["A_min"]), float(config["B_min"]))
         else:
             print("error loading device controller \n")
             exit(1)
@@ -181,7 +242,7 @@ class Device(object):
             self.control_output = self.fan_max_speed
         return self.control_output
 
-class Sensor(object):
+class Sensor():
     '''sensor for measuring non-temperature values'''
     def __init__(self, base_path, config, debug = False) -> None:
         self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
@@ -218,7 +279,7 @@ def get_full_path(base_path, name) -> str:
             return full_path
     print(f"failed to find device {name}")
 
-class FanController(object):
+class FanController():
     '''main FanController class'''
     def __init__(self, debug, config_file):
         self.debug = debug
@@ -280,7 +341,6 @@ class FanController(object):
                 self.loop_read_sensors()
             # read charge state
             self.fan.get_charge_state()
-            # get device controller outputs
             for device in self.devices:
                 device.get_output(device.avg_control_temp, self.power_sensor.avg_value)
             max_output = max(device.control_output for device in self.devices)
@@ -298,16 +358,18 @@ class FanController(object):
 
 # main
 if __name__ == '__main__':
-    print('jupiter-fan-control starting up ...')
-
     # specify config file path
-    # config_file_path = os.getcwd() + "/config.yaml"
-    CONFIG_FILE_PATH = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
+    args = sys.argv
+    if len(args) == 2:
+        CONFIG_FILE_PATH = args[1]
+    else:
+        CONFIG_FILE_PATH = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
 
     # initialize controller
     controller = FanController(debug = False, config_file = CONFIG_FILE_PATH)
+    
+    print("jupiter-fan-control starting up ...")
 
     # start main loop
     controller.loop_control()
     
-    print('jupiter-fan-control startup complete')
