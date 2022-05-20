@@ -50,6 +50,17 @@ devices:
     # Kd: 0
     # windup: 100
     # winddown: 40
+
+  - hwmon_name: amdgpu
+    nice_name: GPU
+    max_temp: 95
+    temp_deadzone: 0
+    file: temp1_input
+    type: quadratic
+    A: 0
+    B: 0
+    C: 0
+    T_threshold: 0
   
   # - hwmon_name: amdgpu
   #   nice_name: GPU
@@ -61,7 +72,6 @@ devices:
   #   B: 3.33
   #   C: -145.7
   #   T_threshold: 45
-  #   P_coeff: 120
   #   # quadratic fit (45,1200), (80,3900), (95,5500) 
   # disabling GPU monitoring as CPU is closely thermally coupled, and has less noise in sensor readings
 
