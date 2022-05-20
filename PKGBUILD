@@ -15,9 +15,11 @@ package() {
   install -m 755 -Dt "$pkgdir/usr/share/$pkgname/" \
     "${srcdir}"/fancontrol.py \
     "${srcdir}"/PID.py \
-    "${srcdir}"/jupiter-fan-control-config.yaml
+    "${srcdir}"/jupiter-fan-control-config.yaml \
+    "${srcdir}"/jfc-static-config.yaml
 }
 sha256sums=('SKIP'
+            'SKIP'
             'SKIP'
             'SKIP'
             'SKIP')
