@@ -24,8 +24,8 @@ devices:
     temp_deadzone: 0
     file: temp1_input
     type: feedforward 
-    A_setpoint: 200
-    B_setpoint: 2000
+    A_ff: 200
+    B_ff: 2000
     T_setpoint: 90
     Kp: 150
     Ki: 30 
