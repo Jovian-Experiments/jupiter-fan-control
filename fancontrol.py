@@ -74,7 +74,7 @@ class FeedForwardMin():
 
     def print_ff_state(self, ff_output, pid_output, min_setpoint) -> str:
         '''prints state variables of FF and PID, helpful for debug'''
-        print(f"FeedForward Controller - Min:{min_setpoint}    FF:{ff_output:.0f}    PID: {-1 * self.pid.PTerm:.0f}  {-1 * self.pid.Ki * self.pid.ITerm:.0f}  {-1 * self.pid.Kd * self.pid.DTerm:.0f} = {pid_output:.0f}")
+        print(f"FeedForward Controller - Min:{min_setpoint}    FF:{ff_output:.0f}    PID:{-1 * self.pid.PTerm:.0f}/{-1 * self.pid.Ki * self.pid.ITerm:.0f}/{-1 * self.pid.Kd * self.pid.DTerm:.0f} = {ff_output + pid_output:.0f}")
 
     def get_ff_setpoint(self, power_input) -> int:
         '''returns the feed forward portion of the controller output'''
