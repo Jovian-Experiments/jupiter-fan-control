@@ -24,15 +24,32 @@ devices:
     max_temp: 95
     temp_deadzone: 0
     file: temp1_input
-    type: feedforward 
-    A_setpoint: 200
-    B_setpoint: 2500
+    type: ffmin 
+    A_min: 120
+    B_min: -5200
+    A_ff: 200
+    B_ff: 2500
     T_setpoint: 83
     Kp: 120
     Ki: 30 
     Kd: 0
     windup: 100
     winddown: 40
+
+    # - hwmon_name: acpitz
+    # nice_name: CPU
+    # max_temp: 95
+    # temp_deadzone: 0
+    # file: temp1_input
+    # type: feedforward 
+    # A_ff: 200
+    # B_ff: 2500
+    # T_setpoint: 83
+    # Kp: 120
+    # Ki: 30 
+    # Kd: 0
+    # windup: 100
+    # winddown: 40
   
   # - hwmon_name: amdgpu
   #   nice_name: GPU
