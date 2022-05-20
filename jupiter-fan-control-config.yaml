@@ -28,9 +28,9 @@ devices:
     A_min: 120
     B_min: -5200
     A_ff: 200
-    B_ff: 2500
-    T_setpoint: 83
-    Kp: 120
+    B_ff: 2000
+    T_setpoint: 90
+    Kp: 150
     Ki: 30 
     Kd: 0
     windup: 100
