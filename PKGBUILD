@@ -6,7 +6,7 @@ pkgrel=1
 arch=('any')
 license=('GPLv3')
 depends=('python3' 'python-pyaml')
-source=("fancontrol.py" "PID.py" "jupiter-fan-control.service" "*.yaml")
+source=("fancontrol.py" "PID.py" "jupiter-fan-control.service" "jupiter-fan-control-config.yaml" "jfc-static-config.yaml")
 # skipping sha256 sums for dev iteration - no 'makepkg -g' needed
 package() {
   pwd
