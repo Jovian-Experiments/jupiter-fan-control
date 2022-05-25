@@ -22,16 +22,16 @@ devices:
   - hwmon_name: acpitz
     nice_name: CPU
     max_temp: 95
-    temp_deadzone: 0
+    temp_deadzone: 2
     file: temp1_input
-    type: ffquad 
-    A_quad: 2.286
-    B_quad: -188.6
-    C_quad: 5457
-    T_quad: 55
-    A_ff: 200
-    B_ff: 2000
-    T_setpoint: 90
+    type: ffquad
+    A_quad: .6286
+    B_quad: 3.143
+    C_quad: -74.29
+    A_ff: 250
+    B_ff: -1750
+    #quadratic fit (55,2000)(80,4200)(90,5300)
+    #linear fit (7,0),(15,2000)
 
   # - hwmon_name: acpitz
   #   nice_name: CPU
