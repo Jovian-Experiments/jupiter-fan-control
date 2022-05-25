@@ -95,6 +95,32 @@ class FeedForwardMin():
         self.print_ff_state(ff_output, pid_output, min_setpoint)
         return self.output
 
+class FeedForwardQuad():
+    '''FF with an additional min curve'''
+    def __init__(self, a_quad, b_quad, c_quad, t_quad, a_ff, b_ff) -> None:
+        '''constructor'''
+        self.temp_setpoint = temp_setpoint
+        self.quad = Quadratic(a_quad, b_quad, c_quad, t_quad)
+        self.output = 0
+
+    def print_ff_state(self, quad_output, pid_output):
+        '''prints state variables of FF and PID, helpful for debug'''
+        print(f"FeedForward Controller - Quad:{quad_output}    FF:{ff_output:.0f}")
+
+    def get_ff_setpoint(self, power_input) -> int:
+        '''returns the feed forward portion of the controller output'''
+        rpm_setpoint = int(self.a_ff * power_input + self.b_ff)
+        return rpm_setpoint
+
+    def update(self, temp_input, power_input) -> int:
+        '''run controller to update output'''
+        quad_output = int(self.quad.update(temp_input))
+        ff_output = self.get_ff_setpoint(power_input)
+        # min_setpoint = self.get_min_setpoint(temp_input)
+        self.output = quad_output + ff_output
+        self.print_ff_state(ff_output, quad_output)
+        return self.output
+
 class Fan():
     '''fan object controls all jupiter hwmon parameters'''
     def __init__(self, fan_path, config, debug = False) -> None:
@@ -211,6 +237,8 @@ class Device():
             self.controller = FeedForward(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup"]), int(config["winddown"]), float(config["A_ff"]), float(config["B_ff"]), float(config["T_setpoint"]))
         elif self.type == "ffmin":
             self.controller = FeedForwardMin(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup"]), int(config["winddown"]), float(config["A_ff"]), float(config["B_ff"]), float(config["T_setpoint"]), float(config["A_min"]), float(config["B_min"]))
+        elif self.type == "ffquad":
+            self.controller = FeedForwardQuad(float(config["A_quad"]), float(config["B_quad"]), float(config["C_quad"]), int(config["T_quad"]) float(config["A_ff"]), float(config["B_ff"]))
         else:
             print("error loading device controller \n")
             exit(1)
