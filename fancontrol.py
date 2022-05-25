@@ -238,7 +238,7 @@ class Device():
         elif self.type == "ffmin":
             self.controller = FeedForwardMin(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup"]), int(config["winddown"]), float(config["A_ff"]), float(config["B_ff"]), float(config["T_setpoint"]), float(config["A_min"]), float(config["B_min"]))
         elif self.type == "ffquad":
-            self.controller = FeedForwardQuad(float(config["A_quad"]), float(config["B_quad"]), float(config["C_quad"]), int(config["T_quad"]) float(config["A_ff"]), float(config["B_ff"]))
+            self.controller = FeedForwardQuad(float(config["A_quad"]), float(config["B_quad"]), float(config["C_quad"]), int(config["T_quad"]), float(config["A_ff"]), float(config["B_ff"]))
         else:
             print("error loading device controller \n")
             exit(1)
