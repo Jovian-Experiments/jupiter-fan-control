@@ -102,6 +102,8 @@ class FeedForwardQuad():
         self.a_ff = a_ff
         self.b_ff = b_ff
         # self.temp_setpoint = temp_setpoint
+        self.ff_deadzone = 1
+        self.ff_last_setpoint = 0
         self.quad = Quadratic(a_quad, b_quad, c_quad)
         self.output = 0
 
@@ -112,7 +114,10 @@ class FeedForwardQuad():
     def get_ff_setpoint(self, power_input) -> int:
         '''returns the feed forward portion of the controller output'''
         rpm_setpoint = int(self.a_ff * power_input + self.b_ff)
-        return rpm_setpoint
+        if abs(rpm_setpoint - self.ff_last_setpoint) > self.ff_deadzone:
+            return rpm_setpoint
+        else:
+            return self.ff_last_setpoint
 
     def update(self, temp_input, power_input) -> int:
         '''run controller to update output'''
@@ -345,8 +350,8 @@ class FanController():
     def print_single(self, source_name):
         '''pretty print all device values, temp source, and output'''
         for device in self.devices:
-                print(f"{device.nice_name}: {device.temp:.1f}/{device.control_output:.0f}  ", end = '')
-                #print("{}: {}  ".format(device.nice_name, device.temp), end = '')
+            print(f"{device.nice_name}: {device.temp:.1f}/{device.control_output:.0f}  ", end = '')
+            #print("{}: {}  ".format(device.nice_name, device.temp), end = '')
         print(f"{self.power_sensor.nice_name}: {self.power_sensor.value:.1f}/{self.power_sensor.avg_value:.1f}  ", end = '')
         print(f"Fan[{source_name}]: {int(self.fan.fc_speed)}/{self.fan.measured_speed}")
 
