@@ -115,9 +115,9 @@ class FeedForwardQuad():
         '''returns the feed forward portion of the controller output'''
         rpm_setpoint = int(self.a_ff * power_input + self.b_ff)
         if abs(rpm_setpoint - self.ff_last_setpoint) > self.ff_deadzone:
+            self.ff_last_setpoint = rpm_setpoint
             return rpm_setpoint
-        else:
-            return self.ff_last_setpoint
+        return self.ff_last_setpoint
 
     def update(self, temp_input, power_input) -> int:
         '''run controller to update output'''
