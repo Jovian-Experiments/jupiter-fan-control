@@ -102,7 +102,7 @@ class FeedForwardQuad():
         self.a_ff = a_ff
         self.b_ff = b_ff
         # self.temp_setpoint = temp_setpoint
-        self.ff_deadzone = 1
+        self.ff_deadzone = 300
         self.ff_last_setpoint = 0
         self.quad = Quadratic(a_quad, b_quad, c_quad)
         self.output = 0
