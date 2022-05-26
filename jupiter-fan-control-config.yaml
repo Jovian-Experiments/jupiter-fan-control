@@ -25,12 +25,12 @@ devices:
     temp_deadzone: 2
     file: temp1_input
     type: ffquad
-    A_quad: .4444
-    B_quad: 8.888
-    C_quad: 444.4
+    A_quad: .9524
+    B_quad: -53.33
+    C_quad: +1771
     A_ff: 250
     B_ff: -1750
-    #quadratic fit (50,2000)(80,4000)(95,5300)
+    #quadratic fit (60,2000)(80,3600)(95,5300)
     #linear fit (7,0),(15,2000)
 
   # - hwmon_name: acpitz
