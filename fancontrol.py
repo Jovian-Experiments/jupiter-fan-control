@@ -194,7 +194,7 @@ class Fan():
         '''updates min rpm depending on charge state'''
         with open(self.charge_state_path, 'r', encoding="utf8") as f:
             state = f.read().strip()
-        if state == "Charging":
+        if state == "Charging" or state == "Full":
             self.charge_state = True
         else:
             self.charge_state = False
