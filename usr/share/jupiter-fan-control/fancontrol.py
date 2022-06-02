@@ -2,6 +2,7 @@
 """jupiter-fan-controller"""
 import signal
 import os
+import sys
 import subprocess
 import time
 import math
@@ -11,7 +12,7 @@ from PID import PID
 # quadratic function RPM = AT^2 + BT + C
 class Quadratic():
     '''quadratic function controller'''
-    def __init__(self, A, B, C, T_threshold) -> None:
+    def __init__(self, A, B, C, T_threshold = 0) -> None:
         '''constructor'''
         self.A = A
         self.B = B
@@ -28,12 +29,12 @@ class Quadratic():
 
 class FeedForward():
     '''RPM predicted by APU power is fed forward + PID output stage'''
-    def __init__(self, Kp, Ki, Kd, windup, winddown, a_setpoint, b_setpoint, temp_setpoint) -> None:
+    def __init__(self, Kp, Ki, Kd, windup, winddown, a_ff, b_ff, temp_setpoint) -> None:
         '''constructor'''
-        self.a_setpoint = a_setpoint
-        self.b_setpoint = b_setpoint
+        self.a_ff = a_ff
+        self.b_ff = b_ff
         self.temp_setpoint = temp_setpoint
-        self.pid = PID(Kp, Ki, Kd)  
+        self.pid = PID(Kp, Ki, Kd)
         self.pid.SetPoint = temp_setpoint
         self.pid.setWindup(windup)
         self.pid.setWinddown(winddown)
@@ -45,7 +46,7 @@ class FeedForward():
 
     def get_ff_setpoint(self, power_input) -> int:
         '''returns the feed forward portion of the controller output'''
-        rpm_setpoint = int(self.a_setpoint * power_input + self.b_setpoint)
+        rpm_setpoint = int(self.a_ff * power_input + self.b_ff)
         return rpm_setpoint
 
     def update(self, temp_input, power_input) -> int:
@@ -54,6 +55,77 @@ class FeedForward():
         ff_output = self.get_ff_setpoint(power_input)
         self.output = int(pid_output + ff_output)
         # self.print_ff_state(ff_output, pid_output)
+        return self.output
+
+class FeedForwardMin():
+    '''FF with an additional min curve'''
+    def __init__(self, Kp, Ki, Kd, windup, winddown, a_ff, b_ff, temp_setpoint, a_min, b_min) -> None:
+        '''constructor'''
+        self.a_ff = a_ff
+        self.b_ff = b_ff
+        self.a_min = a_min
+        self.b_min = b_min
+        self.temp_setpoint = temp_setpoint
+        self.pid = PID(Kp, Ki, Kd)
+        self.pid.SetPoint = temp_setpoint
+        self.pid.setWindup(windup)
+        self.pid.setWinddown(winddown)
+        self.output = 0
+
+    def print_ff_state(self, ff_output, pid_output, min_setpoint) -> str:
+        '''prints state variables of FF and PID, helpful for debug'''
+        print(f"FeedForward Controller - Min:{min_setpoint}    FF:{ff_output:.0f}    PID:{-1 * self.pid.PTerm:.0f}/{-1 * self.pid.Ki * self.pid.ITerm:.0f}/{-1 * self.pid.Kd * self.pid.DTerm:.0f} = {ff_output + pid_output:.0f}")
+
+    def get_ff_setpoint(self, power_input) -> int:
+        '''returns the feed forward portion of the controller output'''
+        rpm_setpoint = int(self.a_ff * power_input + self.b_ff)
+        return rpm_setpoint
+
+    def get_min_setpoint(self, temp_input) -> int:
+        '''returns a minimum rpm speed for the given temperature'''
+        rpm_setpoint =  int(self.a_min * temp_input + self.b_min)
+        return rpm_setpoint
+
+    def update(self, temp_input, power_input) -> int:
+        '''run controller to update output'''
+        pid_output = int(self.pid.update(temp_input))
+        ff_output = self.get_ff_setpoint(power_input)
+        min_setpoint = self.get_min_setpoint(temp_input)
+        self.output = max(min_setpoint,(pid_output + ff_output))
+        self.print_ff_state(ff_output, pid_output, min_setpoint)
+        return self.output
+
+class FeedForwardQuad():
+    '''FF with an additional min curve'''
+    def __init__(self, a_quad, b_quad, c_quad, a_ff, b_ff) -> None:
+        '''constructor'''
+        self.a_ff = a_ff
+        self.b_ff = b_ff
+        # self.temp_setpoint = temp_setpoint
+        self.ff_deadzone = 300
+        self.ff_last_setpoint = 0
+        self.quad = Quadratic(a_quad, b_quad, c_quad)
+        self.output = 0
+
+    def print_ff_state(self, ff_output, quad_output):
+        '''prints state variables of FF and PID, helpful for debug'''
+        print(f"FeedForward Controller - Quad:{quad_output}    FF:{ff_output:.0f}")
+
+    def get_ff_setpoint(self, power_input) -> int:
+        '''returns the feed forward portion of the controller output'''
+        rpm_setpoint = int(self.a_ff * power_input + self.b_ff)
+        if abs(rpm_setpoint - self.ff_last_setpoint) > self.ff_deadzone:
+            self.ff_last_setpoint = rpm_setpoint
+            return rpm_setpoint
+        return self.ff_last_setpoint
+
+    def update(self, temp_input, power_input) -> int:
+        '''run controller to update output'''
+        quad_output = int(self.quad.update(temp_input, None))
+        ff_output = self.get_ff_setpoint(power_input)
+        # min_setpoint = self.get_min_setpoint(temp_input)
+        self.output = quad_output + ff_output
+        self.print_ff_state(ff_output, quad_output)
         return self.output
 
 class Fan():
@@ -169,7 +241,11 @@ class Device():
         elif self.type ==  "quadratic":
             self.controller = Quadratic(float(config["A"]), float(config["B"]), float(config["C"]), float(config["T_threshold"]))
         elif self.type == "feedforward":
-            self.controller = FeedForward(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup"]), int(config["winddown"]), float(config["A_setpoint"]), float(config["B_setpoint"]), float(config["T_setpoint"]))
+            self.controller = FeedForward(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup"]), int(config["winddown"]), float(config["A_ff"]), float(config["B_ff"]), float(config["T_setpoint"]))
+        elif self.type == "ffmin":
+            self.controller = FeedForwardMin(float(config["Kp"]), float(config["Ki"]), float(config["Kd"]), int(config["windup"]), int(config["winddown"]), float(config["A_ff"]), float(config["B_ff"]), float(config["T_setpoint"]), float(config["A_min"]), float(config["B_min"]))
+        elif self.type == "ffquad":
+            self.controller = FeedForwardQuad(float(config["A_quad"]), float(config["B_quad"]), float(config["C_quad"]), float(config["A_ff"]), float(config["B_ff"]))
         else:
             print("error loading device controller \n")
             exit(1)
@@ -242,7 +318,6 @@ class FanController():
     '''main FanController class'''
     def __init__(self, debug, config_file):
         self.debug = debug
-        self.VERSION = '20220517.1'
 
         # read in config yaml file
         if debug:
@@ -275,8 +350,8 @@ class FanController():
     def print_single(self, source_name):
         '''pretty print all device values, temp source, and output'''
         for device in self.devices:
-                print(f"{device.nice_name}: {device.temp:.1f}/{device.control_output:.0f}  ", end = '')
-                #print("{}: {}  ".format(device.nice_name, device.temp), end = '')
+            print(f"{device.nice_name}: {device.temp:.1f}/{device.control_output:.0f}  ", end = '')
+            #print("{}: {}  ".format(device.nice_name, device.temp), end = '')
         print(f"{self.power_sensor.nice_name}: {self.power_sensor.value:.1f}/{self.power_sensor.avg_value:.1f}  ", end = '')
         print(f"Fan[{source_name}]: {int(self.fan.fc_speed)}/{self.fan.measured_speed}")
 
@@ -292,6 +367,7 @@ class FanController():
 
     def loop_control(self):
         '''main control loop'''
+        print("jupiter-fan-control starting up ...")
         while True:
             fan_error = abs(self.fan.fc_speed - self.fan.get_speed())
             if fan_error > 500:
@@ -318,16 +394,15 @@ class FanController():
 
 # main
 if __name__ == '__main__':
-
     # specify config file path
-    # config_file_path = os.getcwd() + "/config.yaml"
     CONFIG_FILE_PATH = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
-
-    # initialize controller
     controller = FanController(debug = False, config_file = CONFIG_FILE_PATH)
-    
-    print(f"jupiter-fan-control version {controller.VERSION} starting up ...")
 
-    # start main loop
-    controller.loop_control()
-    
+    args = sys.argv
+    if len(args) == 2:
+        command = args[1]
+        if command == "--run":
+            controller.loop_control()
+            
+    # otherwise, exit cleanly
+    controller.on_exit(None, None)

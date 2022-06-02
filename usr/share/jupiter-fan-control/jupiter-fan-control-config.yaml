@@ -54,14 +54,3 @@ devices:
     Ki: 20 
     Kd: 0
     windup_limit: 3000
-
-  - hwmon_name: jupiter
-    nice_name: CHG
-    max_temp: 10000
-    temp_deadzone: 0
-    file: curr1_input
-    type: quadratic
-    A: 0
-    B: 0
-    C: 2000
-    T_threshold: 1
