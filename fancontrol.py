@@ -403,5 +403,6 @@ if __name__ == '__main__':
         command = args[1]
         if command == "--run":
             controller.loop_control()
+            
     # otherwise, exit cleanly
     controller.on_exit(None, None)
