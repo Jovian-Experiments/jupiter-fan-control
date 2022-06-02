@@ -1,0 +1,102 @@
+# config file for juputer-fan-control.service
+
+loop_interval: 0.2
+control_loop_ratio: 5
+base_hwmon_path: /sys/class/hwmon/
+charge_state_path: /sys/class/power_supply/BAT1/status
+
+fan_hwmon_name: jupiter
+fan_min_speed: 10
+fan_threshold_speed: 1500
+fan_max_speed: 7300
+fan_gain: 10
+ec_ramp_rate: 10
+
+sensors:
+  - hwmon_name: amdgpu
+    nice_name: P_APU
+    file: power1_average
+    n_sample_avg: 120
+
+devices:
+  - hwmon_name: acpitz
+    nice_name: CPU
+    max_temp: 95
+    temp_deadzone: 2
+    file: temp1_input
+    type: ffquad
+    A_quad: .9524
+    B_quad: -53.33
+    C_quad: +1771
+    A_ff: 250
+    B_ff: -1750
+    #quadratic fit (60,2000)(80,3600)(95,5300)
+    #linear fit (7,0),(15,2000)
+
+  # - hwmon_name: acpitz
+  #   nice_name: CPU
+  #   max_temp: 95
+  #   temp_deadzone: 0
+  #   file: temp1_input
+  #   type: ffmin 
+  #   A_min: 120
+  #   B_min: -5200
+  #   A_ff: 200
+  #   B_ff: 2000
+  #   T_setpoint: 90
+  #   Kp: 150
+  #   Ki: 30 
+  #   Kd: 0
+  #   windup: 100
+  #   winddown: 40
+
+    # - hwmon_name: acpitz
+    # nice_name: CPU
+    # max_temp: 95
+    # temp_deadzone: 0
+    # file: temp1_input
+    # type: feedforward 
+    # A_ff: 200
+    # B_ff: 2500
+    # T_setpoint: 83
+    # Kp: 120
+    # Ki: 30 
+    # Kd: 0
+    # windup: 100
+    # winddown: 40
+
+  - hwmon_name: amdgpu
+    nice_name: GPU
+    max_temp: 95
+    temp_deadzone: 0
+    file: temp1_input
+    type: quadratic
+    A: 0
+    B: 0
+    C: 0
+    T_threshold: 0
+  
+  # - hwmon_name: amdgpu
+  #   nice_name: GPU
+  #   max_temp: 95
+  #   temp_deadzone: 2
+  #   file: temp1_input
+  #   type: quadratic
+  #   A: .59
+  #   B: 3.33
+  #   C: -145.7
+  #   T_threshold: 45
+  #   # quadratic fit (45,1200), (80,3900), (95,5500) 
+  # disabling GPU monitoring as CPU is closely thermally coupled, and has less noise in sensor readings
+
+  - hwmon_name: nvme
+    nice_name: SSD
+    max_temp: 85.0
+    temp_deadzone: 3
+    file: temp1_input
+    type: pid
+    T_setpoint: 70
+    Kp: 100
+    Ki: 20 
+    Kd: 0
+    windup_limit: 500

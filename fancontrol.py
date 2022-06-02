@@ -367,6 +367,7 @@ class FanController():
 
     def loop_control(self):
         '''main control loop'''
+        print("jupiter-fan-control starting up ...")
         while True:
             fan_error = abs(self.fan.fc_speed - self.fan.get_speed())
             if fan_error > 500:
@@ -394,17 +395,13 @@ class FanController():
 # main
 if __name__ == '__main__':
     # specify config file path
+    CONFIG_FILE_PATH = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
+    controller = FanController(debug = False, config_file = CONFIG_FILE_PATH)
+
     args = sys.argv
     if len(args) == 2:
-        CONFIG_FILE_PATH = args[1]
-    else:
-        CONFIG_FILE_PATH = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
-
-    # initialize controller
-    controller = FanController(debug = False, config_file = CONFIG_FILE_PATH)
-    
-    print("jupiter-fan-control starting up ...")
-
-    # start main loop
-    controller.loop_control()
-    
+        command = args[1]
+        if command == "--run":
+            controller.loop_control()
+    # otherwise, exit cleanly
+    controller.on_exit(None, None)

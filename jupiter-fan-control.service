@@ -4,8 +4,9 @@ Description=Jupiter fan control
 [Service]
 Type=simple
 #StandardOutput=null
-#KillSignal=SIGINT
-ExecStart=/usr/share/jupiter-fan-control/fancontrol.py /usr/share/jupiter-fan-control/jfc-static-config.yaml
+
+ExecStart=/usr/share/jupiter-fan-control/fancontrol.py --run
+ExecStopPost=/usr/share/jupiter-fan-control/fancontrol.py --stop 
 
 # disable buffering so STDOUT and STDERR show up immediately in logs
 Environment=PYTHONUNBUFFERED=1
