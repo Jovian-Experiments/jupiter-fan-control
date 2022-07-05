@@ -23,8 +23,9 @@ class Quadratic():
     def update(self, temp_input, _) -> int:
         '''update output'''
         if temp_input < self.T_threshold:
-            return 0
-        self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
+            self.output = 0
+        else:
+            self.output = int(self.A * math.pow(temp_input, 2) + self.B * temp_input + self.C)
         return self.output
 
 class FeedForward():
