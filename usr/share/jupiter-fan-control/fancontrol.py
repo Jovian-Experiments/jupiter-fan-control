@@ -131,9 +131,8 @@ class FeedForwardQuad():
 
 class Fan():
     '''fan object controls all jupiter hwmon parameters'''
-    def __init__(self, fan_path, config, debug = False) -> None:
+    def __init__(self, fan_path, config) -> None:
         '''constructor'''
-        self.debug = debug
         self.fan_path = fan_path
         self.charge_state_path = config["charge_state_path"]
         self.min_speed = config["fan_min_speed"]
@@ -217,14 +216,23 @@ class Fan():
 
 class Device():
     '''devices are sources of heat - CPU, GPU, etc.'''
-    def __init__(self, base_path, config, fan_max_speed, n_sample_avg, debug = False) -> None:
+    def __init__(self, base_path, config, fan_max_speed, n_sample_avg) -> None:
         '''constructor'''
-        self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
-        self.debug = debug
+        self.sensor_path = get_full_path(base_path, config["hwmon_name"]) + config["sensor_name"]
+        self.sensor_path_input = self.sensor_path + "_input"
         self.fan_max_speed = fan_max_speed
         self.n_sample_avg = n_sample_avg
         self.nice_name = config["nice_name"]
-        self.max_temp = config["max_temp"]
+
+        # try to pull critical temperature from the hwmon
+        try:
+            self.max_temp = self.get_critical_temp()
+            if not 60 <= self.max_temp <= 90:
+                raise Exception("Critical temperature out of range")
+            print(f'got critical temp from hwmon: {self.max_temp}')
+        except:
+            self.max_temp = config["max_temp"]
+        
         self.temp_deadzone = config["temp_deadzone"]
         self.temp = 0
         self.control_temp = 0 # deadzone temp
@@ -251,16 +259,21 @@ class Device():
             print("error loading device controller \n")
             exit(1)
 
-    def get_temp(self) -> None:
+    def get_critical_temp(self) -> float:
+        '''returns the critical temperature of the device'''
+        with open(self.sensor_path + '_crit', 'r', encoding="utf8") as f:
+            return int(f.read().strip()) / 1000
+
+    def get_temp(self) -> float:
         '''updates temperatures'''
-        with open(self.file_path, 'r', encoding="utf8") as f:
+        with open(self.sensor_path_input, 'r', encoding="utf8") as f:
             self.temp = int(f.read().strip()) / 1000
         # only update the control temp if it's outside temp_deadzone
         if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
             self.control_temp = self.temp
         return self.control_temp
 
-    def get_avg_temp(self):
+    def get_avg_temp(self) -> float:
         '''updates temperature list + generates average value'''
         self.control_temps.append(self.get_temp())
         if self.buffer_full:
@@ -280,9 +293,8 @@ class Device():
 
 class Sensor():
     '''sensor for measuring non-temperature values'''
-    def __init__(self, base_path, config, debug = False) -> None:
-        self.file_path = get_full_path(base_path, config["hwmon_name"]) + config["file"]
-        self.debug = debug
+    def __init__(self, base_path, config) -> None:
+        self.sensor_path = get_full_path(base_path, config["hwmon_name"]) + config["sensor_name"]
         self.nice_name = config["nice_name"]
         self.n_sample_avg = config["n_sample_avg"]
         self.value = 0
@@ -292,7 +304,7 @@ class Sensor():
 
     def get_value(self) -> float:
         '''returns instantaneous value'''
-        with open(self.file_path, 'r', encoding='utf-8') as f:
+        with open(self.sensor_path, 'r', encoding='utf-8') as f:
             self.value = int(f.read().strip()) / 1000000
         return self.value
     
@@ -317,12 +329,9 @@ def get_full_path(base_path, name) -> str:
 
 class FanController():
     '''main FanController class'''
-    def __init__(self, debug, config_file):
-        self.debug = debug
-
+    def __init__(self, config_file):
+        '''constructor'''
         # read in config yaml file
-        if debug:
-            print("reading config file")
         with open(config_file, "r", encoding="utf8") as f:
             try:
                 self.config = yaml.safe_load(f)
@@ -337,13 +346,13 @@ class FanController():
 
         # initialize fan
         fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name"])
-        self.fan = Fan(fan_path, self.config, self.debug) 
+        self.fan = Fan(fan_path, self.config) 
 
         # initialize list of devices
-        self.devices = [ Device(self.base_hwmon_path, device_config, self.fan.max_speed, self.control_loop_ratio, self.debug) for device_config in self.config["devices"] ]
+        self.devices = [ Device(self.base_hwmon_path, device_config, self.fan.max_speed, self.control_loop_ratio) for device_config in self.config["devices"] ]
 
         # initialize APU power sensor
-        self.power_sensor = Sensor(self.base_hwmon_path, self.config["sensors"][0], self.debug)
+        self.power_sensor = Sensor(self.base_hwmon_path, self.config["sensors"][0])
 
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
@@ -397,7 +406,7 @@ class FanController():
 if __name__ == '__main__':
     # specify config file path
     CONFIG_FILE_PATH = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
-    controller = FanController(debug = False, config_file = CONFIG_FILE_PATH)
+    controller = FanController(config_file = CONFIG_FILE_PATH)
 
     args = sys.argv
     if len(args) == 2:
