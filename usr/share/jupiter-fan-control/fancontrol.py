@@ -223,16 +223,18 @@ class Device():
         self.fan_max_speed = fan_max_speed
         self.n_sample_avg = n_sample_avg
         self.nice_name = config["nice_name"]
+        self.max_temp = config["max_temp"]
 
         # try to pull critical temperature from the hwmon
-        try:
-            self.max_temp = self.get_critical_temp()
-            if not 60 <= self.max_temp <= 90:
-                raise Exception("Critical temperature out of range")
-            print(f'got critical temp from hwmon: {self.max_temp}')
-        except:
-            self.max_temp = config["max_temp"]
-        
+        if config['runtime_max_temp']:
+            try:
+                self.max_temp = self.get_critical_temp()
+                if not 60 <= self.max_temp <= 95:
+                    raise Exception("Critical temperature out of range")
+                print(f'loaded critical temp from hwmon {self.nice_name}: {self.max_temp}')
+            except:
+                print(f'failed to load critical temp from hwmon {self.nice_name}, falling back to config')
+            
         self.temp_deadzone = config["temp_deadzone"]
         self.temp = 0
         self.control_temp = 0 # deadzone temp
