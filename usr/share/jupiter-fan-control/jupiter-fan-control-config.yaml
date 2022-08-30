@@ -48,7 +48,6 @@ devices:
     max_temp: 70.0
     temp_deadzone: 3
     sensor_name: temp1
-    runtime_max_temp: true
     type: pid
     T_setpoint: 70
     Kp: 0
