@@ -2,8 +2,8 @@
 # Maintainer: Christian Marcheselli <christianm@valvesoftware.com>
 
 pkgname=jupiter-fan-control
-_srcbranch=check_critical_temps
-pkgver=5.0
+_srcbranch=voyager_beta
+pkgver=5.1
 pkgrel=1
 arch=('any')
 license=('MIT')
