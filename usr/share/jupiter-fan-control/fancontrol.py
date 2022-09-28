@@ -144,7 +144,7 @@ class Fan():
         self.measured_speed = 0
         self.charge_state = False
         self.charge_min_speed = 2000
-        self.has_std_bios = False   #self.bios_compatibility_check()
+        self.has_std_bios = True   #self.bios_compatibility_check()
         self.take_control_from_ec()
         self.set_speed(3000)
 
