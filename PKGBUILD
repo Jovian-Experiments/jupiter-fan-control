@@ -2,7 +2,7 @@
 # Maintainer: Christian Marcheselli <christianm@valvesoftware.com>
 
 pkgname=jupiter-fan-control
-_srcbranch=voyager_beta
+_srcbranch=reduce_polling_frequency
 pkgver=5.1
 pkgrel=1
 arch=('any')
