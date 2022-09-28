@@ -225,6 +225,11 @@ class Device():
         self.nice_name = config["nice_name"]
         self.max_temp = config["max_temp"]
 
+        self.poll_reduction_multiple = 1 # TODO make this configurable
+        if self.nice_name == "SSD":
+            self.poll_reduction_multiple = 10
+        self.n_poll_requests = 0
+
         # try to pull critical temperature from the hwmon
         try:
             self.max_temp = self.get_critical_temp()
@@ -267,11 +272,14 @@ class Device():
 
     def get_temp(self) -> float:
         '''updates temperatures'''
-        with open(self.sensor_path_input, 'r', encoding="utf8") as f:
-            self.temp = int(f.read().strip()) / 1000
-        # only update the control temp if it's outside temp_deadzone
-        if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
-            self.control_temp = self.temp
+        self.n_poll_requests += 1
+        if self.n_poll_requests >= self.poll_reduction_multiple:
+            with open(self.sensor_path_input, 'r', encoding="utf8") as f:
+                self.temp = int(f.read().strip()) / 1000
+            # only update the control temp if it's outside temp_deadzone
+            if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
+                self.control_temp = self.temp
+            self.n_poll_requests = 0
         return self.control_temp
 
     def get_avg_temp(self) -> float:

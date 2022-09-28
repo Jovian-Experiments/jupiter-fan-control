@@ -49,7 +49,7 @@ devices:
     temp_deadzone: 3
     sensor_name: temp1
     type: pid
-    T_setpoint: 70
+    T_setpoint: 80
     Kp: 0
     Ki: 20 
     Kd: 0
