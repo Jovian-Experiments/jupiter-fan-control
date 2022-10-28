@@ -224,17 +224,16 @@ class Device():
         self.n_sample_avg = n_sample_avg
         self.nice_name = config["nice_name"]
         self.max_temp = config["max_temp"]
+        self.poll_reduction_multiple = config["poll_mult"]
 
-        self.poll_reduction_multiple = 1 # TODO make this configurable
-        if self.nice_name == "SSD":
-            self.poll_reduction_multiple = 10
         self.n_poll_requests = 0
 
         # try to pull critical temperature from the hwmon
         try:
-            self.max_temp = self.get_critical_temp()
-            if not 60 <= self.max_temp <= 95:
+            crit_temp = self.get_critical_temp()
+            if not 60 <= crit_temp <= 100:
                 raise Exception("critical temperature out of range")
+            self.max_temp = crit_temp
             print(f'loaded critical temp from {self.nice_name} hwmon: {self.max_temp}')
         except:
             print(f'failed to load critical temp from {self.nice_name} hwmon, falling back to config')
