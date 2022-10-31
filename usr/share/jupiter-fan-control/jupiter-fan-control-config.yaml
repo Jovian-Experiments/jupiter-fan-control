@@ -15,15 +15,16 @@ ec_ramp_rate: 10
 sensors:
   - hwmon_name: amdgpu
     nice_name: P_APU
-    file: power1_average
+    sensor_name: power1_average
     n_sample_avg: 120
 
 devices:
   - hwmon_name: acpitz
     nice_name: CPU
+    poll_mult: 1
     max_temp: 90
     temp_deadzone: 2
-    file: temp1_input
+    sensor_name: temp1
     type: quadratic
     A: 2.286
     B: -188.6
@@ -33,9 +34,10 @@ devices:
 
   - hwmon_name: amdgpu
     nice_name: GPU
+    poll_mult: 1
     max_temp: 90
     temp_deadzone: 2
-    file: temp1_input
+    sensor_name: temp1
     type: quadratic
     A: 2.286
     B: -188.6
@@ -45,11 +47,12 @@ devices:
 
   - hwmon_name: nvme
     nice_name: SSD
-    max_temp: 70.0
+    poll_mult: 20
+    max_temp: 90.0
     temp_deadzone: 3
-    file: temp1_input
+    sensor_name: temp1
     type: pid
-    T_setpoint: 70
+    T_setpoint: 80
     Kp: 0
     Ki: 20 
     Kd: 0
