@@ -333,7 +333,7 @@ def get_full_path(base_path, name) -> str:
         test_name = open(full_path + "name", encoding="utf8").read().strip()
         if test_name == name:
             return full_path
-    print(f"failed to find device {name}")
+    raise FileNotFoundError(f"failed to find device {name}")
 
 class FanController():
     '''main FanController class'''
@@ -353,8 +353,12 @@ class FanController():
         self.control_loop_ratio = self.config["control_loop_ratio"]
 
         # initialize fan
-        fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name"])
-        self.fan = Fan(fan_path, self.config) 
+        try:
+            fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name"])
+        except FileNotFoundError:
+            fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name_alt"])
+        finally:
+            self.fan = Fan(fan_path, self.config) 
 
         # initialize list of devices
         self.devices = [ Device(self.base_hwmon_path, device_config, self.fan.max_speed, self.control_loop_ratio) for device_config in self.config["devices"] ]
