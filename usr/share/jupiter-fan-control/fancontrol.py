@@ -152,10 +152,20 @@ class Fan():
     def bios_compatibility_check() -> bool:
         """returns True for bios versions >= 106, false for earlier versions"""
         version = subprocess.check_output(["dmidecode", "-s", "bios-version"]) # b'F7A0104T06\n'
+        model = str(version[0:3].decode("utf8"))
         version = int(version[3:7])
+        # print("model: ", model, " version: ", version)
 
-        if version >= 106:
-            return True
+        if model.find("F7A") != -1:
+            if version >= 106:
+                return True
+            else:
+                return False
+        elif model.find("F7G") != -1:
+            if version >= 7:
+                return True
+            else:
+                return False
         else:
             return False
 
@@ -239,6 +249,14 @@ class Device():
             print(f'failed to load critical temp from {self.nice_name} hwmon, falling back to config')
             
         self.temp_deadzone = config["temp_deadzone"]
+        try:
+            self.temp_threshold = config["T_threshold"]
+        except:
+            print(f'failed to load T_threshold')
+            try:
+                self.temp_threshold = config["T_setpoint"]
+            except:
+                print(f'failed to load T_setpoint')
         self.temp = 0
         self.control_temp = 0 # deadzone temp
         self.control_output = 0 # controller output if > 0, max fan speed if max temp reached
@@ -277,6 +295,8 @@ class Device():
                 self.temp = int(f.read().strip()) / 1000
             # only update the control temp if it's outside temp_deadzone
             if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
+                if self.temp == 255:
+                    self.temp = self.temp_threshold
                 self.control_temp = self.temp
             self.n_poll_requests = 0
         return self.control_temp
@@ -289,6 +309,7 @@ class Device():
         elif len(self.control_temps) >= self.n_sample_avg:
             self.buffer_full = True
         self.avg_control_temp = math.fsum(self.control_temps) / len(self.control_temps)
+        # print("Avg temp: ", self.avg_control_temp, " Temp array: ", self.control_temps)
         return self.avg_control_temp
 
     def get_output(self, temp_input, power_input) -> int:
@@ -330,9 +351,15 @@ def get_full_path(base_path, name) -> str:
     '''helper function to find correct hwmon* path for a given device name'''
     for directory in os.listdir(base_path):
         full_path = base_path + directory + '/'
-        test_name = open(full_path + "name", encoding="utf8").read().strip()
-        if test_name == name:
-            return full_path
+        try:
+            test_name = open(full_path + "name", encoding="utf8").read().strip()
+            if test_name == name:
+                return full_path
+        except:
+            print(f'failed to open {directory} folder for sensor {name}')
+        #else:
+        #    print(f'Sensor path for {name} was not found')
+
     raise FileNotFoundError(f"failed to find device {name}")
 
 class FanController():
