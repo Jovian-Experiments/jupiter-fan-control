@@ -8,7 +8,7 @@ ExecStart=/usr/share/jupiter-fan-control/fancontrol.py --run
 ExecStopPost=/usr/share/jupiter-fan-control/fancontrol.py --stop
 
 # disable debug journal logging
-StandardOutput=null
+#StandardOutput=null
 
 # disable buffering so STDOUT and STDERR show up immediately in logs
 Environment=PYTHONUNBUFFERED=1

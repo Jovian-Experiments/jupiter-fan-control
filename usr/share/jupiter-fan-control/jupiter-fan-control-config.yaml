@@ -22,16 +22,19 @@ sensors:
 devices:
   - hwmon_name: acpitz
     nice_name: CPU
-    poll_mult: 1
     max_temp: 90
     temp_deadzone: 2
     sensor_name: temp1
-    type: quadratic
-    A: 2.286
-    B: -188.6
-    C: 5457
-    T_threshold: 55
-    # quadratic fit {{55, 2000}, {80, 5000}, {90, 7000}}
+    poll_mult: 1
+    type: ffquad
+    A_quad: .762
+    B_quad: -26.7
+    C_quad: 1257
+    A_ff: 250
+    B_ff: -1750
+    # quadratic fit (60,2400)(80,4000)(95,5600)
+    # linear fit (7,0),(15,2000)
+
 
   - hwmon_name: amdgpu
     nice_name: GPU
