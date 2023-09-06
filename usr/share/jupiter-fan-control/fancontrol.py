@@ -7,6 +7,7 @@ import subprocess
 import time
 import math
 import yaml
+import csv
 from PID import PID
 
 # quadratic function RPM = AT^2 + BT + C
@@ -93,7 +94,7 @@ class FeedForwardMin():
         ff_output = self.get_ff_setpoint(power_input)
         min_setpoint = self.get_min_setpoint(temp_input)
         self.output = max(min_setpoint,(pid_output + ff_output))
-        self.print_ff_state(ff_output, pid_output, min_setpoint)
+        # self.print_ff_state(ff_output, pid_output, min_setpoint)
         return self.output
 
 class FeedForwardQuad():
@@ -126,7 +127,7 @@ class FeedForwardQuad():
         ff_output = self.get_ff_setpoint(power_input)
         # min_setpoint = self.get_min_setpoint(temp_input)
         self.output = quad_output + ff_output
-        self.print_ff_state(ff_output, quad_output)
+        # self.print_ff_state(ff_output, quad_output)
         return self.output
 
 class Fan():
@@ -146,7 +147,7 @@ class Fan():
         self.charge_min_speed = 2000
         self.has_std_bios = self.bios_compatibility_check()
         self.take_control_from_ec()
-        self.set_speed(3000)
+        self.set_speed(2000)
 
     @staticmethod
     def bios_compatibility_check() -> bool:
@@ -227,6 +228,7 @@ class Fan():
 class Device():
     '''devices are sources of heat - CPU, GPU, etc.'''
     def __init__(self, base_path, config, fan_max_speed, n_sample_avg) -> None:
+
         '''constructor'''
         self.sensor_path = get_full_path(base_path, config["hwmon_name"]) + config["sensor_name"]
         self.sensor_path_input = self.sensor_path + "_input"
@@ -246,7 +248,8 @@ class Device():
             self.max_temp = crit_temp
             print(f'loaded critical temp from {self.nice_name} hwmon: {self.max_temp}')
         except:
-            print(f'failed to load critical temp from {self.nice_name} hwmon, falling back to config')
+            # print(f'failed to load critical temp from {self.nice_name} hwmon, falling back to config')
+            pass
             
         self.temp_deadzone = config["temp_deadzone"]
         try:
@@ -295,7 +298,7 @@ class Device():
                 self.temp = int(f.read().strip()) / 1000
             # only update the control temp if it's outside temp_deadzone
             if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
-                if self.temp == 255:
+                if self.temp >= 255: # catch overflow
                     self.temp = self.temp_threshold
                 self.control_temp = self.temp
             self.n_poll_requests = 0
@@ -356,7 +359,8 @@ def get_full_path(base_path, name) -> str:
             if test_name == name:
                 return full_path
         except:
-            print(f'failed to open {directory} folder for sensor {name}')
+            # print(f'failed to open {directory} folder for sensor {name}')
+            pass
         #else:
         #    print(f'Sensor path for {name} was not found')
 
@@ -393,6 +397,16 @@ class FanController():
         # initialize APU power sensor
         self.power_sensor = Sensor(self.base_hwmon_path, self.config["sensors"][0])
 
+        # open log file
+        log_file_path = "/var/log/jupiter-fan-control.log"
+        try:
+            self.log_file = open(log_file_path, "w", encoding="utf8", newline='')
+            # print(f'logging controller state to {log_file_path}')
+            self.log_writer = csv.writer(self.log_file, delimiter=',')
+            self.log_header()
+        except Exception as e:
+            print(f'failed to open log file {log_file_path} \n {e}')
+
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
 
@@ -403,6 +417,32 @@ class FanController():
             #print("{}: {}  ".format(device.nice_name, device.temp), end = '')
         print(f"{self.power_sensor.nice_name}: {self.power_sensor.value:.1f}/{self.power_sensor.avg_value:.1f}  ", end = '')
         print(f"Fan[{source_name}]: {int(self.fan.fc_speed)}/{self.fan.measured_speed}")
+
+    def log_header(self):
+        header = []
+        for device in self.devices:
+            header.append(f'{device.nice_name}_TEMP')
+            header.append(f'{device.nice_name}_OUT')
+        header.append(f'{self.power_sensor.nice_name}')
+        header.append(f'{self.power_sensor.nice_name}_AVG')
+        header.append(f'FAN_SRC')
+        header.append(f'FAN_TARGET')
+        header.append(f'FAN_REAL')
+        self.log_writer.writerow(header)
+
+
+    def log_single(self, source_name):
+        row = []
+        for device in self.devices:
+            row.append(f'{device.temp:.2f}')
+            row.append(int(device.control_output))
+        row.append(f'{self.power_sensor.value:.2f}')
+        row.append(f'{self.power_sensor.avg_value:.2f}')
+        row.append(source_name)
+        row.append(int(self.fan.fc_speed))
+        row.append(self.fan.measured_speed)
+        self.log_writer.writerow(row)
+        self.log_file.flush()
 
     def loop_read_sensors(self):
         '''internal loop to measure device temps and sensor value'''
@@ -416,7 +456,7 @@ class FanController():
 
     def loop_control(self):
         '''main control loop'''
-        print("jupiter-fan-control starting up ...")
+        print("jupiter-fan-control started successfully.")
         while True:
             fan_error = abs(self.fan.fc_speed - self.fan.get_speed())
             if fan_error > 500:
@@ -433,12 +473,18 @@ class FanController():
             # find source name for the max control output
             source_name = next(device for device in self.devices if device.control_output == max_output).nice_name
             # print all values
-            self.print_single(source_name)
+            # self.print_single(source_name)
+            # log all values
+            try:
+                self.log_single(source_name)
+            except:
+                pass
 
     def on_exit(self, signum, frame):
         '''exit handler'''
-        self.fan.return_to_ec_control()
+        self.log_file.close()
         print("returning fan to EC control loop")
+        self.fan.return_to_ec_control()
         exit()
 
 # main
