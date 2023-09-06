@@ -27,6 +27,7 @@ devices:
     sensor_name: temp1
     poll_mult: 1
     type: ffquad
+    T_threshold: 45
     A_quad: .762
     B_quad: -26.7
     C_quad: 1257
@@ -55,9 +56,9 @@ devices:
     max_temp: 90.0
     temp_deadzone: 3
     sensor_name: temp1
-    type: pid
-    T_setpoint: 80
-    Kp: 0
-    Ki: 20 
-    Kd: 0
-    windup_limit: 3000
+    type: quadratic
+    A: 3.06
+    B: -286.7
+    C: 6510
+    T_threshold: 55
+    # quadratic fit {{55, 0}, {83, 3800}, {90, 5500}}
