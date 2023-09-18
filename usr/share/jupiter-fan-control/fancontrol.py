@@ -397,15 +397,6 @@ class FanController():
         # initialize APU power sensor
         self.power_sensor = Sensor(self.base_hwmon_path, self.config["sensors"][0])
 
-        # open log file
-        log_file_path = "/var/log/jupiter-fan-control.log"
-        try:
-            self.log_file = open(log_file_path, "w", encoding="utf8", newline='')
-            # print(f'logging controller state to {log_file_path}')
-            self.log_writer = csv.writer(self.log_file, delimiter=',')
-            self.log_header()
-        except Exception as e:
-            print(f'failed to open log file {log_file_path} \n {e}')
 
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
@@ -456,6 +447,16 @@ class FanController():
 
     def loop_control(self):
         '''main control loop'''
+        # open log file
+        log_file_path = "/var/log/jupiter-fan-control.log"
+        try:
+            self.log_file = open(log_file_path, "w", encoding="utf8", newline='')
+            # print(f'logging controller state to {log_file_path}')
+            self.log_writer = csv.writer(self.log_file, delimiter=',')
+            self.log_header()
+        except Exception as e:
+            print(f'unable to open log file {log_file_path} \n {e}')
+
         print("jupiter-fan-control started successfully.")
         while True:
             fan_error = abs(self.fan.fc_speed - self.fan.get_speed())
@@ -491,7 +492,12 @@ class FanController():
 if __name__ == '__main__':
     # specify config file path
     CONFIG_FILE_PATH = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
-    controller = FanController(config_file = CONFIG_FILE_PATH)
+
+    try:
+        controller = FanController(config_file = CONFIG_FILE_PATH)
+    except FileNotFoundError: # delay for amdgpu not loaded on service startup
+        time.sleep(4)
+        controller = FanController(config_file = CONFIG_FILE_PATH)
 
     args = sys.argv
     if len(args) == 2:

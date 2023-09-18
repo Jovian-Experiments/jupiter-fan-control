@@ -8,7 +8,7 @@ charge_state_path: /sys/class/power_supply/BAT1/status
 fan_hwmon_name: steamdeck_hwmon
 fan_hwmon_name_alt: jupiter
 fan_min_speed: 10
-fan_threshold_speed: 1500
+fan_threshold_speed: 2000
 fan_max_speed: 7300
 fan_gain: 10
 ec_ramp_rate: 10
