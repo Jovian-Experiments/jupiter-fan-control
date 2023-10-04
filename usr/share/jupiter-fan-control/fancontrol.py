@@ -493,10 +493,11 @@ if __name__ == '__main__':
     # specify config file path
     CONFIG_FILE_PATH = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
 
+    # catch fan service trying to start before the hwmonitors are fully loaded
     try:
         controller = FanController(config_file = CONFIG_FILE_PATH)
     except FileNotFoundError: # delay for amdgpu not loaded on service startup
-        time.sleep(4)
+        time.sleep(1)
         controller = FanController(config_file = CONFIG_FILE_PATH)
 
     args = sys.argv
