@@ -450,7 +450,15 @@ class FanController():
         '''main control loop'''
         # open log file
         log_file_path = "/var/log/jupiter-fan-control.log"
+        old_log_file_path = "/var/log/jupiter-fan-control.old.log"
+
         try:
+            # Check if the log file already exists, if it does, archive it
+            if os.path.exists(log_file_path):
+                if os.path.exists(old_log_file_path):
+                    os.remove(old_log_file_path)
+                os.rename(log_file_path, old_log_file_path)
+            
             self.log_file = open(log_file_path, "w", encoding="utf8", newline='')
             # print(f'logging controller state to {log_file_path}')
             self.log_writer = csv.writer(self.log_file, delimiter=',')
