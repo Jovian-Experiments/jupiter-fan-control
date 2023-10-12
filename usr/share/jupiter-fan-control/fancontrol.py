@@ -320,6 +320,7 @@ class Device():
         self.controller.update(temp_input, power_input)
         self.control_output = max(self.controller.output, 0)
         if(temp_input > self.max_temp):
+            print(f'Warning: {self.nice_name} temperature of {temp_input} greater than max {self.max_temp}! Setting fan to max speed.')
             self.control_output = self.fan_max_speed
         return self.control_output
 
@@ -483,7 +484,10 @@ class FanController():
 
     def on_exit(self, signum, frame):
         '''exit handler'''
-        self.log_file.close()
+        try:
+            self.log_file.close()
+        except:
+            pass
         print("returning fan to EC control loop")
         self.fan.return_to_ec_control()
         exit()
@@ -497,6 +501,7 @@ if __name__ == '__main__':
     try:
         controller = FanController(config_file = CONFIG_FILE_PATH)
     except FileNotFoundError: # delay for amdgpu not loaded on service startup
+        print(f'Warning: hwmons not fully loading, retrying...')
         time.sleep(1)
         controller = FanController(config_file = CONFIG_FILE_PATH)
 
