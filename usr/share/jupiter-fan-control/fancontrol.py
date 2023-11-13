@@ -133,13 +133,13 @@ class FeedForwardQuad():
 class DmiId():
     def __init__(self) -> None:
         self.id = Path('/sys/class/dmi/id')
-        self.bios_release = self.read('bios_release')
+        self.bios_version = self.read('bios_version')
         self.board_name = self.read('board_name')
 
     
     def read(self, identifier):
         with open(self.id / identifier, 'r', encoding='utf-8') as file:
-            return file.read()
+            return file.read().strip()
 
 class Fan():
     '''fan object controls all jupiter hwmon parameters'''
@@ -163,8 +163,8 @@ class Fan():
     @staticmethod
     def bios_compatibility_check(dmi:DmiId) -> bool:
         """returns True for bios versions >= 106, false for earlier versions"""
-        model = str(dmi.bios_release[0:3].decode("utf8"))
-        version = int(dmi.bios_release[3:7])
+        model = str(dmi.bios_version[0:3].decode("utf8"))
+        version = int(dmi.bios_version[3:7])
         # print("model: ", model, " version: ", version)
 
         if model.find("F7A") != -1:
