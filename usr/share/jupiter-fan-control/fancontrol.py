@@ -3,7 +3,7 @@
 import signal
 import os
 import sys
-import subprocess
+from pathlib import Path
 import time
 import math
 import yaml
@@ -130,9 +130,20 @@ class FeedForwardQuad():
         # self.print_ff_state(ff_output, quad_output)
         return self.output
 
+class DmiId():
+    def __init__(self) -> None:
+        self.id = Path('/sys/class/dmi/id')
+        self.bios_release = self.read('bios_release')
+        self.board_name = self.read('board_name')
+
+    
+    def read(self, identifier):
+        with open(self.id / identifier, 'r', encoding='utf-8') as file:
+            return file.read()
+
 class Fan():
     '''fan object controls all jupiter hwmon parameters'''
-    def __init__(self, fan_path, config) -> None:
+    def __init__(self, fan_path, config, dmi) -> None:
         '''constructor'''
         self.fan_path = fan_path
         self.charge_state_path = config["charge_state_path"]
@@ -145,16 +156,15 @@ class Fan():
         self.measured_speed = 0
         self.charge_state = False
         self.charge_min_speed = 2000
-        self.has_std_bios = self.bios_compatibility_check()
+        self.has_std_bios = self.bios_compatibility_check(dmi)
         self.take_control_from_ec()
         self.set_speed(2000)
 
     @staticmethod
-    def bios_compatibility_check() -> bool:
+    def bios_compatibility_check(dmi:DmiId) -> bool:
         """returns True for bios versions >= 106, false for earlier versions"""
-        version = subprocess.check_output(["dmidecode", "-s", "bios-version"]) # b'F7A0104T06\n'
-        model = str(version[0:3].decode("utf8"))
-        version = int(version[3:7])
+        model = str(dmi.bios_release[0:3].decode("utf8"))
+        version = int(dmi.bios_release[3:7])
         # print("model: ", model, " version: ", version)
 
         if model.find("F7A") != -1:
@@ -367,9 +377,10 @@ def get_full_path(base_path, name) -> str:
 
     raise FileNotFoundError(f"failed to find device {name}")
 
+
 class FanController():
     '''main FanController class'''
-    def __init__(self, config_file):
+    def __init__(self, config_file, dmi:DmiId):
         '''constructor'''
         # read in config yaml file
         with open(config_file, "r", encoding="utf8") as f:
@@ -390,7 +401,7 @@ class FanController():
         except FileNotFoundError:
             fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name_alt"])
         finally:
-            self.fan = Fan(fan_path, self.config) 
+            self.fan = Fan(fan_path, self.config, dmi) 
 
         # initialize list of devices
         self.devices = [ Device(self.base_hwmon_path, device_config, self.fan.max_speed, self.control_loop_ratio) for device_config in self.config["devices"] ]
@@ -421,7 +432,6 @@ class FanController():
         header.append(f'FAN_TARGET')
         header.append(f'FAN_REAL')
         self.log_writer.writerow(header)
-
 
     def log_single(self, source_name):
         row = []
@@ -500,18 +510,30 @@ class FanController():
         self.fan.return_to_ec_control()
         exit()
 
+
+
 # main
 if __name__ == '__main__':
-    # specify config file path
-    CONFIG_FILE_PATH = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
+    dmi_id = DmiId()
+
+    if dmi_id.board_name == 'Jupiter':
+        config_file_path = "/usr/share/jupiter-fan-control/jupiter-config.yaml"
+    if dmi_id.board_name == 'Galileo':
+        config_file_path = "/usr/share/jupiter-fan-control/galileo-config.yaml"
+    else:
+        raise NotImplementedError('DMI_ID Board Name not implemented')
 
     # catch fan service trying to start before the hwmonitors are fully loaded
-    try:
-        controller = FanController(config_file = CONFIG_FILE_PATH)
-    except FileNotFoundError: # delay for amdgpu not loaded on service startup
-        print(f'Warning: hwmons not fully loading, retrying...')
-        time.sleep(1)
-        controller = FanController(config_file = CONFIG_FILE_PATH)
+    for retry in range(10):
+        try:
+            controller = FanController(config_file = config_file_path, dmi=dmi_id)
+            break
+        except FileNotFoundError: # delay for amdgpu late load
+            print(f'Warning: hwmons not fully loaded, retrying...')
+            time.sleep(.2)
+            continue
+    if retry == 9:
+        raise FileNotFoundError('Failed to load hwmons after 10 attempts.')
 
     args = sys.argv
     if len(args) == 2:
