@@ -163,7 +163,7 @@ class Fan():
     @staticmethod
     def bios_compatibility_check(dmi:DmiId) -> bool:
         """returns True for bios versions >= 106, false for earlier versions"""
-        model = str(dmi.bios_version[0:3].decode("utf8"))
+        model = dmi.bios_version[0:3]
         version = int(dmi.bios_version[3:7])
         # print("model: ", model, " version: ", version)
 
