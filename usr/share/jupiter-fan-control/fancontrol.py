@@ -3,10 +3,11 @@
 import signal
 import os
 import sys
-import subprocess
+from pathlib import Path
 import time
 import math
 import yaml
+import csv
 from PID import PID
 
 # quadratic function RPM = AT^2 + BT + C
@@ -93,7 +94,7 @@ class FeedForwardMin():
         ff_output = self.get_ff_setpoint(power_input)
         min_setpoint = self.get_min_setpoint(temp_input)
         self.output = max(min_setpoint,(pid_output + ff_output))
-        self.print_ff_state(ff_output, pid_output, min_setpoint)
+        # self.print_ff_state(ff_output, pid_output, min_setpoint)
         return self.output
 
 class FeedForwardQuad():
@@ -126,12 +127,23 @@ class FeedForwardQuad():
         ff_output = self.get_ff_setpoint(power_input)
         # min_setpoint = self.get_min_setpoint(temp_input)
         self.output = quad_output + ff_output
-        self.print_ff_state(ff_output, quad_output)
+        # self.print_ff_state(ff_output, quad_output)
         return self.output
+
+class DmiId():
+    def __init__(self) -> None:
+        self.id = Path('/sys/class/dmi/id')
+        self.bios_version = self.read('bios_version')
+        self.board_name = self.read('board_name')
+
+    
+    def read(self, identifier):
+        with open(self.id / identifier, 'r', encoding='utf-8') as file:
+            return file.read().strip()
 
 class Fan():
     '''fan object controls all jupiter hwmon parameters'''
-    def __init__(self, fan_path, config) -> None:
+    def __init__(self, fan_path, config, dmi) -> None:
         '''constructor'''
         self.fan_path = fan_path
         self.charge_state_path = config["charge_state_path"]
@@ -144,18 +156,27 @@ class Fan():
         self.measured_speed = 0
         self.charge_state = False
         self.charge_min_speed = 2000
-        self.has_std_bios = self.bios_compatibility_check()
+        self.has_std_bios = self.bios_compatibility_check(dmi)
         self.take_control_from_ec()
-        self.set_speed(3000)
+        self.set_speed(2000)
 
     @staticmethod
-    def bios_compatibility_check() -> bool:
+    def bios_compatibility_check(dmi:DmiId) -> bool:
         """returns True for bios versions >= 106, false for earlier versions"""
-        version = subprocess.check_output(["dmidecode", "-s", "bios-version"]) # b'F7A0104T06\n'
-        version = int(version[3:7])
+        model = dmi.bios_version[0:3]
+        version = int(dmi.bios_version[3:7])
+        # print("model: ", model, " version: ", version)
 
-        if version >= 106:
-            return True
+        if model.find("F7A") != -1:
+            if version >= 106:
+                return True
+            else:
+                return False
+        elif model.find("F7G") != -1:
+            if version >= 7:
+                return True
+            else:
+                return False
         else:
             return False
 
@@ -217,6 +238,7 @@ class Fan():
 class Device():
     '''devices are sources of heat - CPU, GPU, etc.'''
     def __init__(self, base_path, config, fan_max_speed, n_sample_avg) -> None:
+
         '''constructor'''
         self.sensor_path = get_full_path(base_path, config["hwmon_name"]) + config["sensor_name"]
         self.sensor_path_input = self.sensor_path + "_input"
@@ -236,9 +258,18 @@ class Device():
             self.max_temp = crit_temp
             print(f'loaded critical temp from {self.nice_name} hwmon: {self.max_temp}')
         except:
-            print(f'failed to load critical temp from {self.nice_name} hwmon, falling back to config')
+            # print(f'failed to load critical temp from {self.nice_name} hwmon, falling back to config')
+            pass
             
         self.temp_deadzone = config["temp_deadzone"]
+        try:
+            self.temp_threshold = config["T_threshold"]
+        except:
+            print(f'failed to load T_threshold')
+            try:
+                self.temp_threshold = config["T_setpoint"]
+            except:
+                print(f'failed to load T_setpoint')
         self.temp = 0
         self.control_temp = 0 # deadzone temp
         self.control_output = 0 # controller output if > 0, max fan speed if max temp reached
@@ -277,6 +308,8 @@ class Device():
                 self.temp = int(f.read().strip()) / 1000
             # only update the control temp if it's outside temp_deadzone
             if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
+                if self.temp >= 255: # catch overflow
+                    self.temp = self.temp_threshold
                 self.control_temp = self.temp
             self.n_poll_requests = 0
         return self.control_temp
@@ -289,6 +322,7 @@ class Device():
         elif len(self.control_temps) >= self.n_sample_avg:
             self.buffer_full = True
         self.avg_control_temp = math.fsum(self.control_temps) / len(self.control_temps)
+        # print("Avg temp: ", self.avg_control_temp, " Temp array: ", self.control_temps)
         return self.avg_control_temp
 
     def get_output(self, temp_input, power_input) -> int:
@@ -296,6 +330,7 @@ class Device():
         self.controller.update(temp_input, power_input)
         self.control_output = max(self.controller.output, 0)
         if(temp_input > self.max_temp):
+            print(f'Warning: {self.nice_name} temperature of {temp_input} greater than max {self.max_temp}! Setting fan to max speed.')
             self.control_output = self.fan_max_speed
         return self.control_output
 
@@ -330,14 +365,22 @@ def get_full_path(base_path, name) -> str:
     '''helper function to find correct hwmon* path for a given device name'''
     for directory in os.listdir(base_path):
         full_path = base_path + directory + '/'
-        test_name = open(full_path + "name", encoding="utf8").read().strip()
-        if test_name == name:
-            return full_path
+        try:
+            test_name = open(full_path + "name", encoding="utf8").read().strip()
+            if test_name == name:
+                return full_path
+        except:
+            # print(f'failed to open {directory} folder for sensor {name}')
+            pass
+        #else:
+        #    print(f'Sensor path for {name} was not found')
+
     raise FileNotFoundError(f"failed to find device {name}")
+
 
 class FanController():
     '''main FanController class'''
-    def __init__(self, config_file):
+    def __init__(self, config_file, dmi:DmiId):
         '''constructor'''
         # read in config yaml file
         with open(config_file, "r", encoding="utf8") as f:
@@ -358,13 +401,14 @@ class FanController():
         except FileNotFoundError:
             fan_path = get_full_path(self.base_hwmon_path, self.config["fan_hwmon_name_alt"])
         finally:
-            self.fan = Fan(fan_path, self.config) 
+            self.fan = Fan(fan_path, self.config, dmi) 
 
         # initialize list of devices
         self.devices = [ Device(self.base_hwmon_path, device_config, self.fan.max_speed, self.control_loop_ratio) for device_config in self.config["devices"] ]
 
         # initialize APU power sensor
         self.power_sensor = Sensor(self.base_hwmon_path, self.config["sensors"][0])
+
 
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
@@ -376,6 +420,31 @@ class FanController():
             #print("{}: {}  ".format(device.nice_name, device.temp), end = '')
         print(f"{self.power_sensor.nice_name}: {self.power_sensor.value:.1f}/{self.power_sensor.avg_value:.1f}  ", end = '')
         print(f"Fan[{source_name}]: {int(self.fan.fc_speed)}/{self.fan.measured_speed}")
+
+    def log_header(self):
+        header = []
+        for device in self.devices:
+            header.append(f'{device.nice_name}_TEMP')
+            header.append(f'{device.nice_name}_OUT')
+        header.append(f'{self.power_sensor.nice_name}')
+        header.append(f'{self.power_sensor.nice_name}_AVG')
+        header.append(f'FAN_SRC')
+        header.append(f'FAN_TARGET')
+        header.append(f'FAN_REAL')
+        self.log_writer.writerow(header)
+
+    def log_single(self, source_name):
+        row = []
+        for device in self.devices:
+            row.append(f'{device.temp:.2f}')
+            row.append(int(device.control_output))
+        row.append(f'{self.power_sensor.value:.2f}')
+        row.append(f'{self.power_sensor.avg_value:.2f}')
+        row.append(source_name)
+        row.append(int(self.fan.fc_speed))
+        row.append(self.fan.measured_speed)
+        self.log_writer.writerow(row)
+        self.log_file.flush()
 
     def loop_read_sensors(self):
         '''internal loop to measure device temps and sensor value'''
@@ -389,7 +458,25 @@ class FanController():
 
     def loop_control(self):
         '''main control loop'''
-        print("jupiter-fan-control starting up ...")
+        # open log file
+        log_file_path = "/var/log/jupiter-fan-control.log"
+        old_log_file_path = "/var/log/jupiter-fan-control.old.log"
+
+        try:
+            # Check if the log file already exists, if it does, archive it
+            if os.path.exists(log_file_path):
+                if os.path.exists(old_log_file_path):
+                    os.remove(old_log_file_path)
+                os.rename(log_file_path, old_log_file_path)
+            
+            self.log_file = open(log_file_path, "w", encoding="utf8", newline='')
+            # print(f'logging controller state to {log_file_path}')
+            self.log_writer = csv.writer(self.log_file, delimiter=',')
+            self.log_header()
+        except Exception as e:
+            print(f'unable to open log file {log_file_path} \n {e}')
+
+        print("jupiter-fan-control started successfully.")
         while True:
             fan_error = abs(self.fan.fc_speed - self.fan.get_speed())
             if fan_error > 500:
@@ -406,19 +493,48 @@ class FanController():
             # find source name for the max control output
             source_name = next(device for device in self.devices if device.control_output == max_output).nice_name
             # print all values
-            self.print_single(source_name)
+            # self.print_single(source_name)
+            # log all values
+            try:
+                self.log_single(source_name)
+            except:
+                pass
 
     def on_exit(self, signum, frame):
         '''exit handler'''
-        self.fan.return_to_ec_control()
+        try:
+            self.log_file.close()
+        except:
+            pass
         print("returning fan to EC control loop")
+        self.fan.return_to_ec_control()
         exit()
+
+
 
 # main
 if __name__ == '__main__':
-    # specify config file path
-    CONFIG_FILE_PATH = "/usr/share/jupiter-fan-control/jupiter-fan-control-config.yaml"
-    controller = FanController(config_file = CONFIG_FILE_PATH)
+    dmi_id = DmiId()
+
+    if dmi_id.board_name == 'Jupiter':
+        config_file_path = "/usr/share/jupiter-fan-control/jupiter-config.yaml"
+    if dmi_id.board_name == 'Galileo':
+        config_file_path = "/usr/share/jupiter-fan-control/galileo-config.yaml"
+    else:
+        print(f'bios: {dmi_id.bios_release}    board: {dmi_id.board_name}')
+        raise NotImplementedError('DMI_ID Board Name not implemented')
+
+    # catch fan service trying to start before the hwmonitors are fully loaded
+    for retry in range(10):
+        try:
+            controller = FanController(config_file = config_file_path, dmi=dmi_id)
+            break
+        except FileNotFoundError: # delay for amdgpu late load
+            print(f'Warning: hwmons not fully loaded, retrying...')
+            time.sleep(.2)
+            continue
+    if retry == 9:
+        raise FileNotFoundError('Failed to load hwmons after 10 attempts.')
 
     args = sys.argv
     if len(args) == 2:
