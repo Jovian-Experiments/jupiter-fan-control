@@ -521,8 +521,7 @@ if __name__ == '__main__':
     if dmi_id.board_name == 'Galileo':
         config_file_path = "/usr/share/jupiter-fan-control/galileo-config.yaml"
     else:
-        print(f'bios: {dmi_id.bios_release}    board: {dmi_id.board_name}')
-        raise NotImplementedError('DMI_ID Board Name not implemented')
+        raise NotImplementedError(f'DMI_ID Board Name not implemented! bios: {dmi_id.bios_version}    board: {dmi_id.board_name}')
 
     # catch fan service trying to start before the hwmonitors are fully loaded
     for retry in range(10):
