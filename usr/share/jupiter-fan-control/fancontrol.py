@@ -518,7 +518,7 @@ if __name__ == '__main__':
 
     if dmi_id.board_name == 'Jupiter':
         config_file_path = "/usr/share/jupiter-fan-control/jupiter-config.yaml"
-    if dmi_id.board_name == 'Galileo':
+    elif dmi_id.board_name == 'Galileo':
         config_file_path = "/usr/share/jupiter-fan-control/galileo-config.yaml"
     else:
         raise NotImplementedError(f'DMI_ID Board Name not implemented! bios: {dmi_id.bios_version}    board: {dmi_id.board_name}')
