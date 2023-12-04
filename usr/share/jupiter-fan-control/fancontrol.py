@@ -434,9 +434,9 @@ class FanController():
         self.log_writer.writerow(header)
 
     def log_single(self, source_name): # ADD TIMESTAMP
-        row = [f'{time.time():0f}']
+        row = [int(time.time())]
         for device in self.devices:
-            row.append(f'{device.temp:.2f}')
+            row.append(int(device.temp))
             row.append(int(device.control_output))
         row.append(f'{self.power_sensor.value:.2f}')
         row.append(f'{self.power_sensor.avg_value:.2f}')
