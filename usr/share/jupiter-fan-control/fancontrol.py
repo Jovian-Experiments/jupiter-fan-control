@@ -421,8 +421,8 @@ class FanController():
         print(f"{self.power_sensor.nice_name}: {self.power_sensor.value:.1f}/{self.power_sensor.avg_value:.1f}  ", end = '')
         print(f"Fan[{source_name}]: {int(self.fan.fc_speed)}/{self.fan.measured_speed}")
 
-    def log_header(self):
-        header = []
+    def log_header(self): # ADD TIMESTAMP
+        header = ['TIMESTAMP']
         for device in self.devices:
             header.append(f'{device.nice_name}_TEMP')
             header.append(f'{device.nice_name}_OUT')
@@ -433,8 +433,8 @@ class FanController():
         header.append(f'FAN_REAL')
         self.log_writer.writerow(header)
 
-    def log_single(self, source_name):
-        row = []
+    def log_single(self, source_name): # ADD TIMESTAMP
+        row = [f'{time.time():0f}']
         for device in self.devices:
             row.append(f'{device.temp:.2f}')
             row.append(int(device.control_output))
