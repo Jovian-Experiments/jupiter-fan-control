@@ -600,8 +600,8 @@ class FanController:
             # log all values
             try:
                 self.log_single(source_name)
-            except:
-                print('wtf!')
+            except Exception as e:
+                raise e
 
     def on_exit(self, signum, frame):
         """exit handler"""
