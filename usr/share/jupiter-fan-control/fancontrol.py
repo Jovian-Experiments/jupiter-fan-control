@@ -512,10 +512,10 @@ class FanController:
         """pretty print all device values, temp source, and output"""
         for device in self.devices:
             print(
-                f"{device.nice_name}: {device.temp:.1f}/{device.control_output:.0f}  ",
+                f"{device.nice_name}: {device.measured_temp:.1f}/{device.control_output:.0f}  ",
                 end="",
             )
-            # print("{}: {}  ".format(device.nice_name, device.temp), end = '')
+            # print("{}: {}  ".format(device.nice_name, device.measured_temp), end = '')
         print(
             f"{self.power_sensor.nice_name}: {self.power_sensor.value:.1f}/{self.power_sensor.avg_value:.1f}  ",
             end="",
@@ -537,7 +537,7 @@ class FanController:
     def log_single(self, source_name):  # ADD TIMESTAMP
         row = [int(time.time())]
         for device in self.devices:
-            row.append(int(device.temp))
+            row.append(int(device.measured_temp))
             row.append(int(device.control_output))
         row.append(f"{self.power_sensor.value:.2f}")
         row.append(f"{self.power_sensor.avg_value:.2f}")
@@ -601,7 +601,8 @@ class FanController:
             try:
                 self.log_single(source_name)
             except Exception as e:
-                raise e
+                # raise e
+                pass
 
     def on_exit(self, signum, frame):
         """exit handler"""
