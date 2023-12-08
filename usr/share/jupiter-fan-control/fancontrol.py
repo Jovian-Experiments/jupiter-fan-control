@@ -270,12 +270,15 @@ class Device():
                 self.temp_threshold = config["T_setpoint"]
             except:
                 print(f'failed to load T_setpoint')
-        self.temp = 0
-        self.control_temp = 0 # deadzone temp
-        self.control_output = 0 # controller output if > 0, max fan speed if max temp reached
+        self.measured_temp = 0
+        self.deadzoned_temp = 0 # deadzone temp
         self.buffer_full = False
-        self.control_temps = []
-        self.avg_control_temp = 0
+        self.deadzoned_temps = []
+        self.avg_deadzoned_temp = 0
+        self.control_temp = 0   # filtered temp, with deadzone and hyseteresis, that is sent to controller to calculate output
+        self.prev_control_temp = 0
+        self.control_output = 0 # controller output if > 0, max fan speed if max temp reached
+
 
         # instantiate controller depending on type
         self.type = config["type"]
@@ -305,32 +308,40 @@ class Device():
         self.n_poll_requests += 1
         if self.n_poll_requests >= self.poll_reduction_multiple:
             with open(self.sensor_path_input, 'r', encoding="utf8") as f:
-                self.temp = int(f.read().strip()) / 1000
+                self.measured_temp = int(f.read().strip()) / 1000
             # only update the control temp if it's outside temp_deadzone
-            if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
-                if self.temp >= 255: # catch overflow
-                    self.temp = self.temp_threshold
-                self.control_temp = self.temp
+            if math.fabs(self.measured_temp - self.deadzoned_temp) >= self.temp_deadzone:
+                if self.measured_temp >= 255: # catch overflow
+                    self.measured_temp = self.temp_threshold
+                self.deadzoned_temp = self.measured_temp
             self.n_poll_requests = 0
-        return self.control_temp
+        return self.deadzoned_temp
 
     def get_avg_temp(self) -> float:
         '''updates temperature list + generates average value'''
-        self.control_temps.append(self.get_temp())
+        self.deadzoned_temps.append(self.get_temp())
         if self.buffer_full:
-            self.control_temps.pop(0)
-        elif len(self.control_temps) >= self.n_sample_avg:
+            self.deadzoned_temps.pop(0)
+        elif len(self.deadzoned_temps) >= self.n_sample_avg:
             self.buffer_full = True
-        self.avg_control_temp = math.fsum(self.control_temps) / len(self.control_temps)
-        # print("Avg temp: ", self.avg_control_temp, " Temp array: ", self.control_temps)
-        return self.avg_control_temp
+        self.avg_deadzoned_temp = math.fsum(self.deadzoned_temps) / len(self.deadzoned_temps)
+        # print("Avg temp: ", self.avg_deadzoned_temp, " Temp array: ", self.deadzoned_temps)
+        return self.avg_deadzoned_temp
 
-    def get_output(self, temp_input, power_input) -> int:
+    # update this to include hysteresis
+    # TODO: define variables from config
+    def get_output(self, power_input) -> int:
         '''updates the device controller and returns bounded output'''
-        self.controller.update(temp_input, power_input)
+        HYSTERESIS = 5
+        
+        if self.avg_deadzoned_temp > self.prev_control_temp or self.prev_control_temp - self.avg_deadzoned_temp > HYSTERESIS: # if we are increasing temp, move immediately
+            self.control_temp = self.avg_deadzoned_temp
+            self.prev_control_temp = self.control_temp
+
+        self.controller.update(self.control_temp, power_input)
         self.control_output = max(self.controller.output, 0)
-        if(temp_input > self.max_temp):
-            print(f'Warning: {self.nice_name} temperature of {temp_input} greater than max {self.max_temp}! Setting fan to max speed.')
+        if(self.control_temp > self.max_temp):
+            print(f'Warning: {self.nice_name} temperature of {self.control_temp} greater than max {self.max_temp}! Setting fan to max speed.')
             self.control_output = self.fan_max_speed
         return self.control_output
 
@@ -487,7 +498,7 @@ class FanController():
             # read charge state
             self.fan.get_charge_state()
             for device in self.devices:
-                device.get_output(device.avg_control_temp, self.power_sensor.avg_value)
+                device.get_output(self.power_sensor.avg_value)
             max_output = max(device.control_output for device in self.devices)
             self.fan.set_speed(max_output)
             # find source name for the max control output

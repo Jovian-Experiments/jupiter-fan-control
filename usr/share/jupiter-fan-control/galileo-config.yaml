@@ -23,7 +23,7 @@ devices:
   - hwmon_name: acpitz
     nice_name: CPU
     max_temp: 90
-    temp_deadzone: 2
+    temp_deadzone: 0
     sensor_name: temp1
     poll_mult: 1
     type: ffquad
@@ -37,28 +37,28 @@ devices:
     # linear fit (7,0),(15,2000)
 
 
-  - hwmon_name: amdgpu
-    nice_name: GPU
-    poll_mult: 1
-    max_temp: 90
-    temp_deadzone: 2
-    sensor_name: temp1
-    type: quadratic
-    A: 2.286
-    B: -188.6
-    C: 5457
-    T_threshold: 55
-    # quadratic fit {{55, 2000}, {80, 5000}, {90, 7000}}
+  # - hwmon_name: amdgpu
+  #   nice_name: GPU
+  #   poll_mult: 1
+  #   max_temp: 90
+  #   temp_deadzone: 2
+  #   sensor_name: temp1
+  #   type: quadratic
+  #   A: 2.286
+  #   B: -188.6
+  #   C: 5457
+  #   T_threshold: 55
+  #   # quadratic fit {{55, 2000}, {80, 5000}, {90, 7000}}
 
-  - hwmon_name: nvme
-    nice_name: SSD
-    poll_mult: 20
-    max_temp: 90.0
-    temp_deadzone: 3
-    sensor_name: temp1
-    type: quadratic
-    A: 3.06
-    B: -286.7
-    C: 6510
-    T_threshold: 55
-    # quadratic fit {{55, 0}, {83, 3800}, {90, 5500}}
+  # - hwmon_name: nvme
+  #   nice_name: SSD
+  #   poll_mult: 20
+  #   max_temp: 90.0
+  #   temp_deadzone: 3
+  #   sensor_name: temp1
+  #   type: quadratic
+  #   A: 3.06
+  #   B: -286.7
+  #   C: 6510
+  #   T_threshold: 55
+  #   # quadratic fit {{55, 0}, {83, 3800}, {90, 5500}}
