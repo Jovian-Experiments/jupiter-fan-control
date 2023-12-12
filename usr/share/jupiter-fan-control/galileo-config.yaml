@@ -13,7 +13,7 @@ fan_min_speed: 10
 fan_threshold_speed: 2000
 fan_max_speed: 7300
 #TODO: integrate new variables into fancontrol.py
-fan_min_time_on: 60
+fan_min_time_on: 120
 fan_gain: 10
 ec_ramp_rate: 10
 

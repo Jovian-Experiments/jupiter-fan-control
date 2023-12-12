@@ -175,7 +175,7 @@ class Fan:
         self.fc_speed = 0
         self.measured_speed = 0
         self.time_on = 0
-        self.on_timer_ready = True
+        self.cold_off = True
         self.charge_state = False
         self.charge_min_speed = self.threshold_speed
         self.has_std_bios = self.bios_compatibility_check(dmi)
@@ -245,22 +245,26 @@ class Fan:
 
     def set_speed(self, speed) -> None:
         """sets a new target speed"""
+
+        # overspeed commanded, set to max
         if speed > self.max_speed:
             speed = self.max_speed
         elif self.charge_state:
             if speed < self.charge_min_speed:
                 speed = self.charge_min_speed
         elif speed < self.threshold_speed:
-            if int(time.time()) - self.time_on >= self.min_time_on:
+            if self.cold_off:
+                speed = self.min_speed
+            elif int(time.time()) - self.time_on >= self.min_time_on:
                 speed = self.min_speed # if min_time satisfied, turn off
-                self.on_timer_ready = True
+                self.cold_off = True
             else:
                 speed = self.threshold_speed # else stay at threshold
         
         # make note of when fan is turned on
-        if speed > self.min_speed and self.on_timer_ready:
+        if speed > self.min_speed and self.cold_off:
             self.time_on = int(time.time())
-            self.on_timer_ready = False
+            self.cold_off = False
         self.fc_speed = speed
         with open(self.fan_path + "fan1_target", "w", encoding="utf8") as f:
             f.write(str(int(self.fc_speed)))
@@ -466,6 +470,7 @@ class Sensor:
             self.values_buffer.popleft()
             self.values_buffer.append(sensor_value)
 
+        print(f'values buffer = {self.values_buffer}')
         self.avg_value = math.fsum(self.values_buffer) / len(self.values_buffer)
         return self.avg_value
 
