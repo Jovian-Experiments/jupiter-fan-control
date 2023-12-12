@@ -4,6 +4,7 @@ import signal
 import os
 import sys
 from pathlib import Path
+from collections import deque
 import time
 import math
 import yaml
@@ -168,12 +169,15 @@ class Fan:
         self.min_speed = config["fan_min_speed"]
         self.threshold_speed = config["fan_threshold_speed"]
         self.max_speed = config["fan_max_speed"]
+        self.min_time_on = config["fan_min_time_on"]
         self.gain = config["fan_gain"]
         self.ec_ramp_rate = config["ec_ramp_rate"]
         self.fc_speed = 0
         self.measured_speed = 0
+        self.time_on = 0
+        self.on_timer_ready = True
         self.charge_state = False
-        self.charge_min_speed = 2000
+        self.charge_min_speed = self.threshold_speed
         self.has_std_bios = self.bios_compatibility_check(dmi)
         self.take_control_from_ec()
         self.set_speed(2000)
@@ -247,8 +251,16 @@ class Fan:
             if speed < self.charge_min_speed:
                 speed = self.charge_min_speed
         elif speed < self.threshold_speed:
-            speed = self.min_speed
-
+            if int(time.time()) - self.time_on >= self.min_time_on:
+                speed = self.min_speed # if min_time satisfied, turn off
+                self.on_timer_ready = True
+            else:
+                speed = self.threshold_speed # else stay at threshold
+        
+        # make note of when fan is turned on
+        if speed > self.min_speed and self.on_timer_ready:
+            self.time_on = int(time.time())
+            self.on_timer_ready = False
         self.fc_speed = speed
         with open(self.fan_path + "fan1_target", "w", encoding="utf8") as f:
             f.write(str(int(self.fc_speed)))
@@ -416,31 +428,45 @@ class Device:
 class Sensor:
     """sensor for measuring non-temperature values"""
 
-    def __init__(self, base_path, config) -> None:
+    def __init__(self, base_path, config, t_fast, t_slow) -> None:
         self.sensor_path = (
             get_full_path(base_path, config["hwmon_name"]) + config["sensor_name"]
         )
+
         self.nice_name = config["nice_name"]
-        self.n_sample_avg = config["n_sample_avg"]
-        self.value = 0
+        self.power_threshold = config["low_power_threshold"]
+        sensor_time_avg = config["sensor_time_avg"]
+        self.n_avg_slow = int(sensor_time_avg / t_slow)
+        self.n_avg_fast = int(sensor_time_avg / t_fast)
+
         self.avg_value = 0
-        self.buffer_full = False
-        self.values = []
+        self.is_low_power = True
+
+        self.values_buffer = deque([self.power_threshold] * self.n_avg_slow)
 
     def get_value(self) -> float:
         """returns instantaneous value"""
         with open(self.sensor_path, "r", encoding="utf-8") as f:
-            self.value = int(f.read().strip()) / 1000000
-        return self.value
+            value = int(f.read().strip()) / 1000000
+        return value
 
     def get_avg_value(self) -> float:
         """returns average value"""
-        self.values.append(self.get_value())
-        if self.buffer_full:
-            self.values.pop(0)
-        elif len(self.values) >= self.n_sample_avg:
-            self.buffer_full = True
-        self.avg_value = math.fsum(self.values) / len(self.values)
+        sensor_value = self.get_value()
+        if self.is_low_power and sensor_value > self.power_threshold:
+            # low power state -> high power state
+            self.is_low_power = False
+            self.values_buffer = deque([self.avg_value] * (self.n_avg_fast - 1)).append(sensor_value)
+        elif not self.is_low_power and sensor_value <= self.power_threshold:
+            # high power state -> low power state
+            self.is_low_power = True
+            self.values_buffer = deque([self.avg_value] * (self.n_avg_slow - 1)).append(sensor_value)
+        else:
+            # pop oldest value and append latest reading
+            self.values_buffer.popleft()
+            self.values_buffer.append(sensor_value)
+
+        self.avg_value = math.fsum(self.values_buffer) / len(self.values_buffer)
         return self.avg_value
 
 
@@ -476,7 +502,8 @@ class FanController:
 
         # store global parameters
         self.base_hwmon_path = self.config["base_hwmon_path"]
-        self.loop_interval = self.config["loop_interval"]
+        self.fast_loop_interval = self.config["fast_loop_interval"]
+        self.slow_loop_interval = self.config["slow_loop_interval"]
         self.control_loop_ratio = self.config["control_loop_ratio"]
 
         # initialize fan
@@ -503,7 +530,7 @@ class FanController:
         ]
 
         # initialize APU power sensor
-        self.power_sensor = Sensor(self.base_hwmon_path, self.config["sensors"][0])
+        self.power_sensor = Sensor(self.base_hwmon_path, self.config["sensors"][0], self.fast_loop_interval, self.slow_loop_interval)
 
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
@@ -522,7 +549,7 @@ class FanController:
         )
         print(f"Fan[{source_name}]: {int(self.fan.fc_speed)}/{self.fan.measured_speed}")
 
-    def log_header(self):  # ADD TIMESTAMP
+    def log_header(self):  
         header = ["TIMESTAMP"]
         for device in self.devices:
             header.append(f"{device.nice_name}_TEMP")
@@ -534,7 +561,7 @@ class FanController:
         header.append(f"FAN_REAL")
         self.log_writer.writerow(header)
 
-    def log_single(self, source_name):  # ADD TIMESTAMP
+    def log_single(self, source_name):
         row = [int(time.time())]
         for device in self.devices:
             row.append(int(device.measured_temp))
@@ -553,7 +580,11 @@ class FanController:
         self.power_sensor.get_avg_value()
         for device in self.devices:
             device.get_avg_temp()
-        sleep_time = self.loop_interval - (time.time() - start_time)
+
+        # choose between low and high power loop interval
+        loop_interval = self.slow_loop_interval if self.power_sensor.is_low_power else self.fast_loop_interval
+
+        sleep_time = loop_interval - (time.time() - start_time)
         if sleep_time > 0:
             time.sleep(sleep_time)
 
