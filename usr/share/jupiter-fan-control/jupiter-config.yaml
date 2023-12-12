@@ -1,5 +1,5 @@
 # config file for juputer-fan-control.service
-
+#TODO in testing, remove this line when ready for release
 
 fast_loop_interval: 0.2
 slow_loop_interval: 1   # TODO test this out
