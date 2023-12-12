@@ -438,6 +438,11 @@ class Sensor:
         )
 
         self.nice_name = config["nice_name"]
+
+        print(f"NEW SENSOR INIT: {self.nice_name}") # TODO REMOVE
+
+
+
         self.power_threshold = config["low_power_threshold"]
         sensor_time_avg = config["sensor_time_avg"]
         self.n_avg_slow = int(sensor_time_avg / t_slow)
@@ -470,7 +475,7 @@ class Sensor:
             self.values_buffer.popleft()
             self.values_buffer.append(sensor_value)
 
-        print(f'values buffer = {self.values_buffer}')
+        print(f'values buffer = {self.values_buffer}') #TODO DELETE
         self.avg_value = math.fsum(self.values_buffer) / len(self.values_buffer)
         return self.avg_value
 
