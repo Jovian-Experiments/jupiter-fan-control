@@ -9,6 +9,7 @@ import time
 import math
 import yaml
 import csv
+import argparse
 from PID import PID
 
 
@@ -386,7 +387,7 @@ class Device:
                     return self.temp_threshold
                 else:
                     return temp
-        return self.measured_temp
+        return self.meas
 
     def get_avg_temp(self) -> float:
         """updates temperature list + generates average value"""
@@ -500,6 +501,7 @@ class FanController:
         self.fast_loop_interval = self.config["fast_loop_interval"]
         self.slow_loop_interval = self.config["slow_loop_interval"]
         self.control_loop_ratio = self.config["control_loop_ratio"]
+        self.log_write_ratio = self.config["log_write_ratio"]
 
         # initialize fan
         try:
@@ -555,6 +557,7 @@ class FanController:
         header.append(f"FAN_TARGET")
         header.append(f"FAN_REAL")
         self.log_writer.writerow(header)
+        self.unwritten_log_lines = 1
 
     def log_single(self, source_name):
         row = [int(time.time())]
@@ -567,7 +570,10 @@ class FanController:
         row.append(int(self.fan.fc_speed))
         row.append(self.fan.measured_speed)
         self.log_writer.writerow(row)
-        self.log_file.flush()
+        self.unwritten_log_lines += 1
+        if self.unwritten_log_lines >= self.log_write_ratio:
+            self.log_file.flush()
+            self.unwritten_log_lines = 0
 
     def loop_read_sensors(self):
         """internal loop to measure device temps and sensor value"""
