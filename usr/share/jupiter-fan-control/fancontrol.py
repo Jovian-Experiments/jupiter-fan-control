@@ -309,9 +309,9 @@ class Device:
                 print(f"failed to load T_setpoint")
 
         # state variables
-        self.n_poll_requests = 0
-        self.measured_temp = 0
-        self.temps_buffer = deque([self.get_temp()] * self.n_sample_avg)
+        self.n_poll_requests = self.poll_reduction_multiple 
+        self.measured_temp = self.get_temp()
+        self.temps_buffer = deque([self.measured_temp] * self.n_sample_avg)
         self.avg_temp = 0
         self.control_temp = 0  # filtered temp, with hyseteresis, that is sent to controller to calculate output
         self.prev_control_temp = 0
@@ -386,6 +386,7 @@ class Device:
                     return self.temp_threshold
                 else:
                     return temp
+        return self.measured_temp
 
     def get_avg_temp(self) -> float:
         """updates temperature list + generates average value"""
