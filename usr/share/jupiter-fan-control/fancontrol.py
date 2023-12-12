@@ -387,7 +387,7 @@ class Device:
                     return self.temp_threshold
                 else:
                     return temp
-        return self.meas
+        return self.measured_temp
 
     def get_avg_temp(self) -> float:
         """updates temperature list + generates average value"""
