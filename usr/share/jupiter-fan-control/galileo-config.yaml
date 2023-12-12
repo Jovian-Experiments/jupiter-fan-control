@@ -62,7 +62,7 @@ devices:
     nice_name: SSD
     poll_mult: 30
     max_temp: 90.0
-    temp_deadzone: 3
+    temp_hysteresis: 3
     sensor_name: temp1
     type: quadratic
     A: 4.57
