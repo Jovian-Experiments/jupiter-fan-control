@@ -464,10 +464,13 @@ class Sensor:
         sensor_value = self.get_value()
         if self.is_low_power and sensor_value > self.power_threshold:
             # low power state -> high power state
+            print(f"LOW TO HIGH") # TODO REMOVE
+
             self.is_low_power = False
             self.values_buffer = deque([self.avg_value] * (self.n_avg_fast - 1)).append(sensor_value)
         elif not self.is_low_power and sensor_value <= self.power_threshold:
             # high power state -> low power state
+            print(f"HIGH TO LOW") # TODO REMOVE
             self.is_low_power = True
             self.values_buffer = deque([self.avg_value] * (self.n_avg_slow - 1)).append(sensor_value)
         else:
