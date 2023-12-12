@@ -12,7 +12,6 @@ fan_hwmon_name_alt: jupiter
 fan_min_speed: 10
 fan_threshold_speed: 2000
 fan_max_speed: 7300
-#TODO: integrate new variables into fancontrol.py
 fan_min_time_on: 120
 fan_gain: 10
 ec_ramp_rate: 10
@@ -23,10 +22,8 @@ sensors:
   - hwmon_name: amdgpu
     nice_name: P_APU
     sensor_name: power1_average
-    
-    # TODO make sure logic for n ->t works
     sensor_time_avg: 24
-    low_power_threshold: 7 #TODO check this works
+    low_power_threshold: 7
 
 devices:
   - hwmon_name: acpitz
@@ -63,7 +60,7 @@ devices:
 
   - hwmon_name: nvme
     nice_name: SSD
-    poll_mult: 20
+    poll_mult: 30
     max_temp: 90.0
     temp_deadzone: 3
     sensor_name: temp1
