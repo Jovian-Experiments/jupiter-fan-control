@@ -438,20 +438,16 @@ class Sensor:
         )
 
         self.nice_name = config["nice_name"]
-
-        print(f"NEW SENSOR INIT: {self.nice_name}") # TODO REMOVE
-
-
-
         self.power_threshold = config["low_power_threshold"]
         sensor_time_avg = config["sensor_time_avg"]
         self.n_avg_slow = int(sensor_time_avg / t_slow)
         self.n_avg_fast = int(sensor_time_avg / t_fast)
 
-        self.avg_value = 0
+        self.avg_value = self.power_threshold #TODO should this start higher?
         self.is_low_power = True
 
-        self.values_buffer = deque([self.power_threshold] * self.n_avg_slow)
+        
+        self.values_buffer = deque([self.avg_value] * self.n_avg_slow)
 
     def get_value(self) -> float:
         """returns instantaneous value"""
@@ -464,21 +460,19 @@ class Sensor:
         sensor_value = self.get_value()
         if self.is_low_power and sensor_value > self.power_threshold:
             # low power state -> high power state
-            print(f"LOW TO HIGH") # TODO REMOVE
-
             self.is_low_power = False
-            self.values_buffer = deque([self.avg_value] * (self.n_avg_fast - 1)).append(sensor_value)
+            self.values_buffer = deque([self.avg_value] * (self.n_avg_fast - 1))
+            self.values_buffer.append(sensor_value)
         elif not self.is_low_power and sensor_value <= self.power_threshold:
             # high power state -> low power state
-            print(f"HIGH TO LOW") # TODO REMOVE
             self.is_low_power = True
-            self.values_buffer = deque([self.avg_value] * (self.n_avg_slow - 1)).append(sensor_value)
+            self.values_buffer = deque([self.avg_value] * (self.n_avg_slow - 1))
+            self.values_buffer.append(sensor_value)
         else:
             # pop oldest value and append latest reading
             self.values_buffer.popleft()
             self.values_buffer.append(sensor_value)
 
-        print(f'values buffer = {self.values_buffer}') #TODO DELETE
         self.avg_value = math.fsum(self.values_buffer) / len(self.values_buffer)
         return self.avg_value
 
