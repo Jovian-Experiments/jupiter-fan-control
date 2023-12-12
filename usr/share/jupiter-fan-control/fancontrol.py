@@ -457,21 +457,21 @@ class Sensor:
 
     def get_avg_value(self) -> float:
         """returns average value"""
-        sensor_value = self.get_value()
-        if self.is_low_power and sensor_value > self.power_threshold:
+        self.value = self.get_value()
+        if self.is_low_power and self.value > self.power_threshold:
             # low power state -> high power state
             self.is_low_power = False
             self.values_buffer = deque([self.avg_value] * (self.n_avg_fast - 1))
-            self.values_buffer.append(sensor_value)
-        elif not self.is_low_power and sensor_value <= self.power_threshold:
+            self.values_buffer.append(self.value)
+        elif not self.is_low_power and self.value <= self.power_threshold:
             # high power state -> low power state
             self.is_low_power = True
             self.values_buffer = deque([self.avg_value] * (self.n_avg_slow - 1))
-            self.values_buffer.append(sensor_value)
+            self.values_buffer.append(self.value)
         else:
             # pop oldest value and append latest reading
             self.values_buffer.popleft()
-            self.values_buffer.append(sensor_value)
+            self.values_buffer.append(self.value)
 
         self.avg_value = math.fsum(self.values_buffer) / len(self.values_buffer)
         return self.avg_value
@@ -623,6 +623,7 @@ class FanController:
             # read device temps and power sensor
             for _ in range(self.control_loop_ratio):
                 self.loop_read_sensors()
+                
             # read charge state
             self.fan.get_charge_state()
             for device in self.devices:
@@ -639,7 +640,7 @@ class FanController:
             try:
                 self.log_single(source_name)
             except Exception as e:
-                # raise e
+                print(f'log single encountered error: {e}')
                 pass
 
     def on_exit(self, signum, frame):
