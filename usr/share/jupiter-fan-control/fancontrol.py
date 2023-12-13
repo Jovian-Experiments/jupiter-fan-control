@@ -165,6 +165,10 @@ class Fan:
 
     def __init__(self, fan_path, config, dmi, dry:bool) -> None:
         """constructor"""
+        #TODO: DELETE THIS OR POLISH
+        self.dry = dry
+
+
         self.fan_path = fan_path
         self.charge_state_path = config["charge_state_path"]
         self.min_speed = config["fan_min_speed"]
@@ -183,8 +187,7 @@ class Fan:
         self.take_control_from_ec()
         self.set_speed(2000)
 
-        #TODO: DELETE THIS OR POLISH
-        self.dry = dry
+        
 
     @staticmethod
     def bios_compatibility_check(dmi: DmiId) -> bool:
