@@ -640,7 +640,9 @@ class FanController:
     def on_exit(self, signum, frame):
         """exit handler"""
         try:
+            self.log_file.flush()
             self.log_file.close()
+            print("closed log file")
         except:
             pass
         print("returning fan to EC control loop")
