@@ -4,7 +4,7 @@
 fast_loop_interval: 0.2
 slow_loop_interval: 1
 control_loop_ratio: 5
-write_log_every: 60
+log_write_ratio: 60
 base_hwmon_path: /sys/class/hwmon/
 charge_state_path: /sys/class/power_supply/BAT1/status
 
@@ -17,7 +17,7 @@ fan_min_time_on: 120
 fan_gain: 10
 ec_ramp_rate: 10
 
-
+dry_run: False
 
 sensors:
   - hwmon_name: amdgpu
