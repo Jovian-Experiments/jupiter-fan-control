@@ -4,10 +4,12 @@ import signal
 import os
 import sys
 from pathlib import Path
+from collections import deque
 import time
 import math
 import yaml
 import csv
+import argparse
 from PID import PID
 
 
@@ -161,19 +163,25 @@ class DmiId:
 class Fan:
     """fan object controls all jupiter hwmon parameters"""
 
-    def __init__(self, fan_path, config, dmi) -> None:
+    def __init__(self, fan_path, config, dmi, dry: bool) -> None:
         """constructor"""
+        # TODO: DELETE THIS OR POLISH
+        self.dry = dry
+
         self.fan_path = fan_path
         self.charge_state_path = config["charge_state_path"]
         self.min_speed = config["fan_min_speed"]
         self.threshold_speed = config["fan_threshold_speed"]
         self.max_speed = config["fan_max_speed"]
+        self.min_time_on = config["fan_min_time_on"]
         self.gain = config["fan_gain"]
         self.ec_ramp_rate = config["ec_ramp_rate"]
         self.fc_speed = 0
         self.measured_speed = 0
+        self.time_on = 0
+        self.cold_off = True
         self.charge_state = False
-        self.charge_min_speed = 2000
+        self.charge_min_speed = self.threshold_speed
         self.has_std_bios = self.bios_compatibility_check(dmi)
         self.take_control_from_ec()
         self.set_speed(2000)
@@ -200,6 +208,8 @@ class Fan:
 
     def take_control_from_ec(self) -> None:
         """take over fan control from ec mcu"""
+        if self.dry:
+            return
         if self.has_std_bios:
             return
         else:
@@ -241,14 +251,29 @@ class Fan:
 
     def set_speed(self, speed) -> None:
         """sets a new target speed"""
+
+        if self.dry:
+            return
+
+        # overspeed commanded, set to max
         if speed > self.max_speed:
             speed = self.max_speed
         elif self.charge_state:
             if speed < self.charge_min_speed:
                 speed = self.charge_min_speed
         elif speed < self.threshold_speed:
-            speed = self.min_speed
+            if self.cold_off:
+                speed = self.min_speed
+            elif int(time.time()) - self.time_on >= self.min_time_on:
+                speed = self.min_speed  # if min_time satisfied, turn off
+                self.cold_off = True
+            else:
+                speed = self.threshold_speed  # else stay at threshold
 
+        # make note of when fan is turned on
+        if speed > self.min_speed and self.cold_off:
+            self.time_on = int(time.time())
+            self.cold_off = False
         self.fc_speed = speed
         with open(self.fan_path + "fan1_target", "w", encoding="utf8") as f:
             f.write(str(int(self.fc_speed)))
@@ -263,18 +288,16 @@ class Device:
             get_full_path(base_path, config["hwmon_name"]) + config["sensor_name"]
         )
         self.sensor_path_input = self.sensor_path + "_input"
-        self.fan_max_speed = fan_max_speed
-        self.n_sample_avg = n_sample_avg
         self.nice_name = config["nice_name"]
         self.max_temp = config["max_temp"]
         self.poll_reduction_multiple = config["poll_mult"]
-
-        self.n_poll_requests = 0
+        self.fan_max_speed = fan_max_speed
+        self.n_sample_avg = n_sample_avg
 
         # try to pull critical temperature from the hwmon
         try:
             crit_temp = self.get_critical_temp()
-            if not 60 <= crit_temp <= 100:
+            if not 60 <= crit_temp <= 95:
                 raise Exception("critical temperature out of range")
             self.max_temp = crit_temp
             print(f"loaded critical temp from {self.nice_name} hwmon: {self.max_temp}")
@@ -282,7 +305,8 @@ class Device:
             # print(f'failed to load critical temp from {self.nice_name} hwmon, falling back to config')
             pass
 
-        self.temp_deadzone = config["temp_deadzone"]
+        # self.temp_deadzone = config["temp_deadzone"]
+        self.temp_hysteresis = config["temp_hysteresis"]
         try:
             self.temp_threshold = config["T_threshold"]
         except:
@@ -291,14 +315,15 @@ class Device:
                 self.temp_threshold = config["T_setpoint"]
             except:
                 print(f"failed to load T_setpoint")
-        self.temp = 0
-        self.control_temp = 0  # deadzone temp
-        self.control_output = (
-            0  # controller output if > 0, max fan speed if max temp reached
-        )
-        self.buffer_full = False
-        self.control_temps = []
-        self.avg_control_temp = 0
+
+        # state variables
+        self.n_poll_requests = self.poll_reduction_multiple
+        self.measured_temp = self.get_temp()
+        self.temps_buffer = deque([self.measured_temp] * self.n_sample_avg)
+        self.avg_temp = 0
+        self.control_temp = 0  # filtered temp, with hyseteresis, that is sent to controller to calculate output
+        self.prev_control_temp = 0
+        self.control_output = 0
 
         # instantiate controller depending on type
         self.type = config["type"]
@@ -363,33 +388,38 @@ class Device:
         self.n_poll_requests += 1
         if self.n_poll_requests >= self.poll_reduction_multiple:
             with open(self.sensor_path_input, "r", encoding="utf8") as f:
-                self.temp = int(f.read().strip()) / 1000
-            # only update the control temp if it's outside temp_deadzone
-            if math.fabs(self.temp - self.control_temp) >= self.temp_deadzone:
-                if self.temp >= 255:  # catch overflow
-                    self.temp = self.temp_threshold
-                self.control_temp = self.temp
-            self.n_poll_requests = 0
-        return self.control_temp
+                temp = int(f.read().strip()) / 1000
+                self.n_poll_requests = 0
+                if temp >= 255:  # catch overflow
+                    return self.temp_threshold
+                else:
+                    return temp
+        return self.measured_temp
 
     def get_avg_temp(self) -> float:
         """updates temperature list + generates average value"""
-        self.control_temps.append(self.get_temp())
-        if self.buffer_full:
-            self.control_temps.pop(0)
-        elif len(self.control_temps) >= self.n_sample_avg:
-            self.buffer_full = True
-        self.avg_control_temp = math.fsum(self.control_temps) / len(self.control_temps)
-        # print("Avg temp: ", self.avg_control_temp, " Temp array: ", self.control_temps)
-        return self.avg_control_temp
+        self.measured_temp = self.get_temp()
+        self.temps_buffer.popleft()
+        self.temps_buffer.append(self.measured_temp)
+        self.avg_temp = math.fsum(self.temps_buffer) / self.n_sample_avg
+        return self.avg_temp
 
-    def get_output(self, temp_input, power_input) -> int:
+    # update this to include hysteresis
+    # TODO: define variables from config
+    def get_output(self, power_input) -> int:
         """updates the device controller and returns bounded output"""
-        self.controller.update(temp_input, power_input)
+        if (  # check if temp is increasing, or has decreased past hysteresis
+            self.avg_temp > self.prev_control_temp
+            or self.prev_control_temp - self.avg_temp > self.temp_hysteresis
+        ):
+            self.control_temp = self.avg_temp
+            self.prev_control_temp = self.control_temp
+
+        self.controller.update(self.control_temp, power_input)
         self.control_output = max(self.controller.output, 0)
-        if temp_input > self.max_temp:
+        if self.control_temp > self.max_temp:
             print(
-                f"Warning: {self.nice_name} temperature of {temp_input} greater than max {self.max_temp}! Setting fan to max speed."
+                f"Warning: {self.nice_name} temperature of {self.control_temp} greater than max {self.max_temp}! Setting fan to max speed."
             )
             self.control_output = self.fan_max_speed
         return self.control_output
@@ -398,31 +428,47 @@ class Device:
 class Sensor:
     """sensor for measuring non-temperature values"""
 
-    def __init__(self, base_path, config) -> None:
+    def __init__(self, base_path, config, t_fast, t_slow) -> None:
         self.sensor_path = (
             get_full_path(base_path, config["hwmon_name"]) + config["sensor_name"]
         )
+
         self.nice_name = config["nice_name"]
-        self.n_sample_avg = config["n_sample_avg"]
-        self.value = 0
-        self.avg_value = 0
-        self.buffer_full = False
-        self.values = []
+        self.power_threshold = config["low_power_threshold"]
+        sensor_time_avg = config["sensor_time_avg"]
+        self.n_avg_slow = int(sensor_time_avg / t_slow)
+        self.n_avg_fast = int(sensor_time_avg / t_fast)
+
+        self.avg_value = self.power_threshold  # TODO should this start higher?
+        self.is_low_power = True
+
+        self.values_buffer = deque([self.avg_value] * self.n_avg_slow)
 
     def get_value(self) -> float:
         """returns instantaneous value"""
         with open(self.sensor_path, "r", encoding="utf-8") as f:
-            self.value = int(f.read().strip()) / 1000000
-        return self.value
+            value = int(f.read().strip()) / 1000000
+        return value
 
     def get_avg_value(self) -> float:
         """returns average value"""
-        self.values.append(self.get_value())
-        if self.buffer_full:
-            self.values.pop(0)
-        elif len(self.values) >= self.n_sample_avg:
-            self.buffer_full = True
-        self.avg_value = math.fsum(self.values) / len(self.values)
+        self.value = self.get_value()
+        if self.is_low_power and self.value > self.power_threshold:
+            # low power state -> high power state
+            self.is_low_power = False
+            self.values_buffer = deque([self.avg_value] * (self.n_avg_fast - 1))
+            self.values_buffer.append(self.value)
+        elif not self.is_low_power and self.value <= self.power_threshold:
+            # high power state -> low power state
+            self.is_low_power = True
+            self.values_buffer = deque([self.avg_value] * (self.n_avg_slow - 1))
+            self.values_buffer.append(self.value)
+        else:
+            # pop oldest value and append latest reading
+            self.values_buffer.popleft()
+            self.values_buffer.append(self.value)
+
+        self.avg_value = math.fsum(self.values_buffer) / len(self.values_buffer)
         return self.avg_value
 
 
@@ -458,8 +504,13 @@ class FanController:
 
         # store global parameters
         self.base_hwmon_path = self.config["base_hwmon_path"]
-        self.loop_interval = self.config["loop_interval"]
+        self.fast_loop_interval = self.config["fast_loop_interval"]
+        self.slow_loop_interval = self.config["slow_loop_interval"]
         self.control_loop_ratio = self.config["control_loop_ratio"]
+        self.log_write_ratio = self.config["log_write_ratio"]
+
+        # TODO: DELETE ME OR POLISH
+        self.dry = bool(self.config["dry_run"])
 
         # initialize fan
         try:
@@ -471,7 +522,7 @@ class FanController:
                 self.base_hwmon_path, self.config["fan_hwmon_name_alt"]
             )
         finally:
-            self.fan = Fan(fan_path, self.config, dmi)
+            self.fan = Fan(fan_path, self.config, dmi, self.dry)
 
         # initialize list of devices
         self.devices = [
@@ -485,7 +536,12 @@ class FanController:
         ]
 
         # initialize APU power sensor
-        self.power_sensor = Sensor(self.base_hwmon_path, self.config["sensors"][0])
+        self.power_sensor = Sensor(
+            self.base_hwmon_path,
+            self.config["sensors"][0],
+            self.fast_loop_interval,
+            self.slow_loop_interval,
+        )
 
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
@@ -494,17 +550,17 @@ class FanController:
         """pretty print all device values, temp source, and output"""
         for device in self.devices:
             print(
-                f"{device.nice_name}: {device.temp:.1f}/{device.control_output:.0f}  ",
+                f"{device.nice_name}: {device.measured_temp:.1f}/{device.control_output:.0f}  ",
                 end="",
             )
-            # print("{}: {}  ".format(device.nice_name, device.temp), end = '')
+            # print("{}: {}  ".format(device.nice_name, device.measured_temp), end = '')
         print(
             f"{self.power_sensor.nice_name}: {self.power_sensor.value:.1f}/{self.power_sensor.avg_value:.1f}  ",
             end="",
         )
         print(f"Fan[{source_name}]: {int(self.fan.fc_speed)}/{self.fan.measured_speed}")
 
-    def log_header(self):  # ADD TIMESTAMP
+    def log_header(self):
         header = ["TIMESTAMP"]
         for device in self.devices:
             header.append(f"{device.nice_name}_TEMP")
@@ -515,11 +571,12 @@ class FanController:
         header.append(f"FAN_TARGET")
         header.append(f"FAN_REAL")
         self.log_writer.writerow(header)
+        self.unwritten_log_lines = 1
 
-    def log_single(self, source_name):  # ADD TIMESTAMP
+    def log_single(self, source_name):
         row = [int(time.time())]
         for device in self.devices:
-            row.append(int(device.temp))
+            row.append(int(device.measured_temp))
             row.append(int(device.control_output))
         row.append(f"{self.power_sensor.value:.2f}")
         row.append(f"{self.power_sensor.avg_value:.2f}")
@@ -527,7 +584,10 @@ class FanController:
         row.append(int(self.fan.fc_speed))
         row.append(self.fan.measured_speed)
         self.log_writer.writerow(row)
-        self.log_file.flush()
+        self.unwritten_log_lines += 1
+        if self.unwritten_log_lines >= self.log_write_ratio:
+            self.log_file.flush()
+            self.unwritten_log_lines = 0
 
     def loop_read_sensors(self):
         """internal loop to measure device temps and sensor value"""
@@ -535,7 +595,15 @@ class FanController:
         self.power_sensor.get_avg_value()
         for device in self.devices:
             device.get_avg_temp()
-        sleep_time = self.loop_interval - (time.time() - start_time)
+
+        # choose between low and high power loop interval
+        loop_interval = (
+            self.slow_loop_interval
+            if self.power_sensor.is_low_power
+            else self.fast_loop_interval
+        )
+
+        sleep_time = loop_interval - (time.time() - start_time)
         if sleep_time > 0:
             time.sleep(sleep_time)
 
@@ -567,10 +635,11 @@ class FanController:
             # read device temps and power sensor
             for _ in range(self.control_loop_ratio):
                 self.loop_read_sensors()
+
             # read charge state
             self.fan.get_charge_state()
             for device in self.devices:
-                device.get_output(device.avg_control_temp, self.power_sensor.avg_value)
+                device.get_output(self.power_sensor.avg_value)
             max_output = max(device.control_output for device in self.devices)
             self.fan.set_speed(max_output)
             # find source name for the max control output
@@ -582,13 +651,16 @@ class FanController:
             # log all values
             try:
                 self.log_single(source_name)
-            except:
+            except Exception as e:
+                print(f"log single encountered error: {e}")
                 pass
 
     def on_exit(self, signum, frame):
         """exit handler"""
         try:
+            self.log_file.flush()
             self.log_file.close()
+            print("closed log file")
         except:
             pass
         print("returning fan to EC control loop")
