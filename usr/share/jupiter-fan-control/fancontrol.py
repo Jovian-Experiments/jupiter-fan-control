@@ -163,11 +163,10 @@ class DmiId:
 class Fan:
     """fan object controls all jupiter hwmon parameters"""
 
-    def __init__(self, fan_path, config, dmi, dry:bool) -> None:
+    def __init__(self, fan_path, config, dmi, dry: bool) -> None:
         """constructor"""
-        #TODO: DELETE THIS OR POLISH
+        # TODO: DELETE THIS OR POLISH
         self.dry = dry
-
 
         self.fan_path = fan_path
         self.charge_state_path = config["charge_state_path"]
@@ -186,8 +185,6 @@ class Fan:
         self.has_std_bios = self.bios_compatibility_check(dmi)
         self.take_control_from_ec()
         self.set_speed(2000)
-
-        
 
     @staticmethod
     def bios_compatibility_check(dmi: DmiId) -> bool:
@@ -268,11 +265,11 @@ class Fan:
             if self.cold_off:
                 speed = self.min_speed
             elif int(time.time()) - self.time_on >= self.min_time_on:
-                speed = self.min_speed # if min_time satisfied, turn off
+                speed = self.min_speed  # if min_time satisfied, turn off
                 self.cold_off = True
             else:
-                speed = self.threshold_speed # else stay at threshold
-        
+                speed = self.threshold_speed  # else stay at threshold
+
         # make note of when fan is turned on
         if speed > self.min_speed and self.cold_off:
             self.time_on = int(time.time())
@@ -297,7 +294,6 @@ class Device:
         self.fan_max_speed = fan_max_speed
         self.n_sample_avg = n_sample_avg
 
-
         # try to pull critical temperature from the hwmon
         try:
             crit_temp = self.get_critical_temp()
@@ -321,7 +317,7 @@ class Device:
                 print(f"failed to load T_setpoint")
 
         # state variables
-        self.n_poll_requests = self.poll_reduction_multiple 
+        self.n_poll_requests = self.poll_reduction_multiple
         self.measured_temp = self.get_temp()
         self.temps_buffer = deque([self.measured_temp] * self.n_sample_avg)
         self.avg_temp = 0
@@ -412,7 +408,7 @@ class Device:
     # TODO: define variables from config
     def get_output(self, power_input) -> int:
         """updates the device controller and returns bounded output"""
-        if ( # check if temp is increasing, or has decreased past hysteresis
+        if (  # check if temp is increasing, or has decreased past hysteresis
             self.avg_temp > self.prev_control_temp
             or self.prev_control_temp - self.avg_temp > self.temp_hysteresis
         ):
@@ -443,10 +439,9 @@ class Sensor:
         self.n_avg_slow = int(sensor_time_avg / t_slow)
         self.n_avg_fast = int(sensor_time_avg / t_fast)
 
-        self.avg_value = self.power_threshold #TODO should this start higher?
+        self.avg_value = self.power_threshold  # TODO should this start higher?
         self.is_low_power = True
 
-        
         self.values_buffer = deque([self.avg_value] * self.n_avg_slow)
 
     def get_value(self) -> float:
@@ -514,8 +509,7 @@ class FanController:
         self.control_loop_ratio = self.config["control_loop_ratio"]
         self.log_write_ratio = self.config["log_write_ratio"]
 
-
-        #TODO: DELETE ME OR POLISH
+        # TODO: DELETE ME OR POLISH
         self.dry = bool(self.config["dry_run"])
 
         # initialize fan
@@ -542,7 +536,12 @@ class FanController:
         ]
 
         # initialize APU power sensor
-        self.power_sensor = Sensor(self.base_hwmon_path, self.config["sensors"][0], self.fast_loop_interval, self.slow_loop_interval)
+        self.power_sensor = Sensor(
+            self.base_hwmon_path,
+            self.config["sensors"][0],
+            self.fast_loop_interval,
+            self.slow_loop_interval,
+        )
 
         # exit handler
         signal.signal(signal.SIGTERM, self.on_exit)
@@ -561,7 +560,7 @@ class FanController:
         )
         print(f"Fan[{source_name}]: {int(self.fan.fc_speed)}/{self.fan.measured_speed}")
 
-    def log_header(self):  
+    def log_header(self):
         header = ["TIMESTAMP"]
         for device in self.devices:
             header.append(f"{device.nice_name}_TEMP")
@@ -598,7 +597,11 @@ class FanController:
             device.get_avg_temp()
 
         # choose between low and high power loop interval
-        loop_interval = self.slow_loop_interval if self.power_sensor.is_low_power else self.fast_loop_interval
+        loop_interval = (
+            self.slow_loop_interval
+            if self.power_sensor.is_low_power
+            else self.fast_loop_interval
+        )
 
         sleep_time = loop_interval - (time.time() - start_time)
         if sleep_time > 0:
@@ -632,7 +635,7 @@ class FanController:
             # read device temps and power sensor
             for _ in range(self.control_loop_ratio):
                 self.loop_read_sensors()
-                
+
             # read charge state
             self.fan.get_charge_state()
             for device in self.devices:
@@ -649,7 +652,7 @@ class FanController:
             try:
                 self.log_single(source_name)
             except Exception as e:
-                print(f'log single encountered error: {e}')
+                print(f"log single encountered error: {e}")
                 pass
 
     def on_exit(self, signum, frame):
