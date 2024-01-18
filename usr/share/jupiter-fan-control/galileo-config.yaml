@@ -17,8 +17,6 @@ fan_min_time_on: 120
 fan_gain: 10
 ec_ramp_rate: 10
 
-dry_run: False
-
 sensors:
   - hwmon_name: amdgpu
     nice_name: P_APU

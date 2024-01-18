@@ -163,11 +163,8 @@ class DmiId:
 class Fan:
     """fan object controls all jupiter hwmon parameters"""
 
-    def __init__(self, fan_path, config, dmi, dry: bool) -> None:
+    def __init__(self, fan_path, config, dmi) -> None:
         """constructor"""
-        # TODO: DELETE THIS OR POLISH
-        self.dry = dry
-
         self.fan_path = fan_path
         self.charge_state_path = config["charge_state_path"]
         self.min_speed = config["fan_min_speed"]
@@ -208,8 +205,6 @@ class Fan:
 
     def take_control_from_ec(self) -> None:
         """take over fan control from ec mcu"""
-        if self.dry:
-            return
         if self.has_std_bios:
             return
         else:
@@ -251,9 +246,6 @@ class Fan:
 
     def set_speed(self, speed) -> None:
         """sets a new target speed"""
-
-        if self.dry:
-            return
 
         # overspeed commanded, set to max
         if speed > self.max_speed:
@@ -405,7 +397,6 @@ class Device:
         return self.avg_temp
 
     # update this to include hysteresis
-    # TODO: define variables from config
     def get_output(self, power_input) -> int:
         """updates the device controller and returns bounded output"""
         if (  # check if temp is increasing, or has decreased past hysteresis
@@ -509,9 +500,6 @@ class FanController:
         self.control_loop_ratio = self.config["control_loop_ratio"]
         self.log_write_ratio = self.config["log_write_ratio"]
 
-        # TODO: DELETE ME OR POLISH
-        self.dry = bool(self.config["dry_run"])
-
         # initialize fan
         try:
             fan_path = get_full_path(
@@ -522,7 +510,7 @@ class FanController:
                 self.base_hwmon_path, self.config["fan_hwmon_name_alt"]
             )
         finally:
-            self.fan = Fan(fan_path, self.config, dmi, self.dry)
+            self.fan = Fan(fan_path, self.config, dmi)
 
         # initialize list of devices
         self.devices = [
