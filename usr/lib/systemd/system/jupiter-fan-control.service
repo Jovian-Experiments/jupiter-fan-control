@@ -1,5 +1,7 @@
 [Unit]
 Description=Jupiter fan control
+ConditionPathExists=/sys/class/dmi/id/bios_version
+ConditionPathExists=/sys/class/dmi/id/board_name
 
 [Service]
 Type=simple
