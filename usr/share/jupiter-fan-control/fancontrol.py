@@ -9,9 +9,16 @@ import time
 import math
 import yaml
 import csv
-import logging
 import argparse
 from PID import PID
+
+
+class Dummy:
+    def __init__(self) -> None:
+        self.output = 0
+
+    def update(self, temp_input, _) -> int:
+        return 0
 
 
 # quadratic function RPM = AT^2 + BT + C
@@ -123,7 +130,7 @@ class FeedForwardQuad:
         self.a_ff = a_ff
         self.b_ff = b_ff
         # self.temp_setpoint = temp_setpoint
-        self.ff_deadzone = 300
+        self.ff_deadzone = 0
         self.ff_last_setpoint = 0
         self.quad = Quadratic(a_quad, b_quad, c_quad)
         self.output = 0
@@ -176,22 +183,28 @@ class Fan:
         self.min_time_on = config["fan_min_time_on"]
         self.gain = config["fan_gain"]
         self.ec_ramp_rate = config["ec_ramp_rate"]
+        self.fan_hysteresis = config["fan_hysteresis"]
         self.fc_speed = 0
         self.measured_speed = 0
+        self.nohyst_speed = 0
         self.time_on = 0
         self.cold_off = True
         self.charge_state = False
         self.charge_min_speed = self.threshold_speed
         self.has_std_bios = self.bios_compatibility_check(dmi)
+        self._reset_hysteresis()
         self.take_control_from_ec()
-        self.set_speed(2000)
+        self.set_speed(self.threshold_speed)
 
     @staticmethod
     def bios_compatibility_check(dmi: DmiId) -> bool:
         """returns True for bios versions >= 106, false for earlier versions"""
-        model = dmi.bios_version[0:3]
-        version = int(dmi.bios_version[3:7])
-        # print("model: ", model, " version: ", version)
+        try:
+            model = dmi.bios_version[0:3]
+            version = int(dmi.bios_version[3:7])
+        except ValueError:
+            print(f'Compatibility Check Skipped! DmiId bios_version:{dmi.bios_version} board_name:{dmi.board_name}')
+            return True
 
         if model.find("F7A") != -1:
             if version >= 106:
@@ -203,6 +216,8 @@ class Fan:
                 return True
             else:
                 return False
+        elif model.find("F7F") != -1:
+                return True
         else:
             return False
 
@@ -239,6 +254,8 @@ class Fan:
 
     def get_charge_state(self) -> bool:
         """updates min rpm depending on charge state"""
+        if self.charge_state_path == False:
+            return False
         with open(self.charge_state_path, "r", encoding="utf8") as f:
             state = f.read().strip()
         if state == "Charging":
@@ -247,28 +264,53 @@ class Fan:
             self.charge_state = False
         return self.charge_state
 
+    def _reset_hysteresis(self):
+        self._hyst_min = 0
+        self._hyst_max = 0
+
+    def _apply_hysteresis(self, new_speed: float) -> float:
+        """Applies hysteresis filtering on fan output."""
+        if new_speed > self._hyst_max:
+            self._hyst_max = new_speed
+            self._hyst_min = new_speed - self.fan_hysteresis
+            return new_speed
+        elif new_speed < self._hyst_min:
+            self._hyst_min = new_speed
+            self._hyst_max = new_speed + self.fan_hysteresis
+            return self._hyst_max
+        else:
+            return self.fc_speed
+
     def set_speed(self, speed) -> None:
         """sets a new target speed"""
 
         # overspeed commanded, set to max
         if speed > self.max_speed:
             speed = self.max_speed
-        elif self.charge_state:
+
+        # apply output hysteresis
+        self.nohyst_speed = speed
+        speed = self._apply_hysteresis(speed)
+
+        # bound speed by minimum, taking into account charge state
+        if self.charge_state:
             if speed < self.charge_min_speed:
                 speed = self.charge_min_speed
-        elif speed < self.threshold_speed:
+        elif self.min_time_on > 0 and speed < self.threshold_speed:
             if self.cold_off:
                 speed = self.min_speed
             elif int(time.time()) - self.time_on >= self.min_time_on:
-                speed = self.min_speed  # if min_time satisfied, turn off
+                speed = self.min_speed
                 self.cold_off = True
             else:
-                speed = self.threshold_speed  # else stay at threshold
+                speed = self.threshold_speed
+        elif speed <= self.min_speed:
+            speed = self.min_speed
 
-        # make note of when fan is turned on
-        if speed > self.min_speed and self.cold_off:
+        if self.min_time_on > 0 and speed > self.min_speed and self.cold_off:
             self.time_on = int(time.time())
             self.cold_off = False
+
         self.fc_speed = speed
         with open(self.fan_path + "fan1_target", "w", encoding="utf8") as f:
             f.write(str(int(self.fc_speed)))
@@ -369,6 +411,8 @@ class Device:
                 float(config["A_ff"]),
                 float(config["B_ff"]),
             )
+        elif self.type == "dummy":
+            self.controller = Dummy()
         else:
             print("error loading device controller \n")
             exit(1)
@@ -383,7 +427,10 @@ class Device:
         self.n_poll_requests += 1
         if self.n_poll_requests >= self.poll_reduction_multiple:
             with open(self.sensor_path_input, "r", encoding="utf8") as f:
-                temp = int(f.read().strip()) / 1000
+                try:
+                    temp = int(f.read().strip()) / 1000
+                except PermissionError as e:
+                    temp = 0
                 self.n_poll_requests = 0
                 if temp >= 255:  # catch overflow
                     return self.temp_threshold
@@ -433,7 +480,11 @@ class Sensor:
         self.n_avg_slow = int(sensor_time_avg / t_slow)
         self.n_avg_fast = int(sensor_time_avg / t_fast)
 
-        self.avg_value = self.power_threshold  # TODO should this start higher?
+        try:
+            self.avg_value = self.get_value()
+        except Exception as e:
+            print(f'Sensor initialization: get_value() returned {e}')
+            self.avg_value = self.power_threshold
         self.is_low_power = True
 
         self.values_buffer = deque([self.avg_value] * self.n_avg_slow)
@@ -441,7 +492,10 @@ class Sensor:
     def get_value(self) -> float:
         """returns instantaneous value"""
         with open(self.sensor_path, "r", encoding="utf-8") as f:
-            value = int(f.read().strip()) / 1000000
+            try:
+                value = int(f.read().strip()) / 1000000
+            except PermissionError as e:
+                value = 0
         return value
 
     def get_avg_value(self) -> float:
@@ -518,7 +572,7 @@ class FanController:
             for device_config in self.config["devices"]
         ]
 
-        # initialize APU power sensor
+        # initialize APU power sensor #TODO make this work with all hardware types, consider adding RAPLSensor from tuner.py
         self.power_sensor = Sensor(
             self.base_hwmon_path,
             self.config["sensors"][0],
@@ -671,11 +725,14 @@ class FanController:
 # main
 if __name__ == "__main__":
     dmi_id = DmiId()
+    script_dir = Path(__file__).resolve().parent
 
     if dmi_id.board_name == "Jupiter":
-        config_file_path = "/usr/share/jupiter-fan-control/jupiter-config.yaml"
+        config_file_path = script_dir / "jupiter-config.yaml"
     elif dmi_id.board_name == "Galileo":
-        config_file_path = "/usr/share/jupiter-fan-control/galileo-config.yaml"
+        config_file_path = script_dir / "galileo-config.yaml"
+    elif dmi_id.board_name == "Fremont":
+        config_file_path = script_dir / "fremont-config.yaml"
     else:
         sys.exit(0)
 

@@ -16,6 +16,7 @@ fan_max_speed: 7300
 fan_min_time_on: 120
 fan_gain: 10
 ec_ramp_rate: 10
+fan_hysteresis: 700
 
 sensors:
   - hwmon_name: amdgpu
@@ -28,7 +29,7 @@ devices:
   - hwmon_name: acpitz
     nice_name: CPU
     max_temp: 90
-    temp_hysteresis: 5
+    temp_hysteresis: 0
     sensor_name: temp1
     poll_mult: 1
     type: quadratic
@@ -42,7 +43,7 @@ devices:
     nice_name: GPU
     poll_mult: 1
     max_temp: 90
-    temp_hysteresis: 5
+    temp_hysteresis: 0
     sensor_name: temp1
     type: quadratic
     A: 2.286
@@ -55,7 +56,7 @@ devices:
     nice_name: SSD
     poll_mult: 30
     max_temp: 90.0
-    temp_hysteresis: 3
+    temp_hysteresis: 0
     sensor_name: temp1
     type: quadratic
     A: 4.57
