@@ -1,0 +1,55 @@
+[project]
+name = "jupiter-fan-control"
+version = "0.1.0"
+description = "Fan controller for Jupiter, Galileo, and Fremont hardware"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+]
+
+[tool.ruff]
+target-version = "py310"
+src = ["usr/share/jupiter-fan-control"]
+
+[tool.ruff.lint]
+select = [
+    "F",     # pyflakes
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "I",     # isort
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "SIM",   # flake8-simplify
+    "PIE",   # flake8-pie
+    "RET",   # flake8-return
+    "PLR",   # pylint refactor
+    "BLE",   # flake8-blind-except
+    "T20",   # flake8-print (warn only)
+    "ERA",   # commented-out code
+]
+ignore = [
+    "E501",    # line too long — not worth reformatting control system code
+    "BLE001",  # blind exception — intentional catch-alls in init/exit paths
+    "PLR1730", # replace if with min/max — explicit branches clearer in set_speed
+    "PLR2004", # magic values — control constants are fine inline
+    "PLR0911", # too many return statements — bios_compatibility_check is clear as-is
+    "PLR0913", # too many arguments — controller constructors need many params
+    "PLR1722", # use sys.exit — exit() is fine in this context
+    "RET504",  # unnecessary assignment before return — named variables are clearer
+    "RET505",  # unnecessary else after return — explicit branches are clearer
+    "SIM103",  # return condition directly — readability over brevity in bios checks
+    "SIM115",  # use context manager — log file and one-liner reads are fine as-is
+    "T201",    # print — this is a systemd service, print is the log interface
+    "B007",    # loop control variable not used in body — retry is used after the loop
+]
+
+[tool.ruff.lint.per-file-ignores]
+"PID.py" = [
+    "ERA001", # commented-out code — third-party header comments
+    "E741",   # ambiguous variable name I — PID convention (P, I, D)
+]
