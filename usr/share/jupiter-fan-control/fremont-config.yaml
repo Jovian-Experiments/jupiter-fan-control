@@ -1,0 +1,75 @@
+# config file for juputer-fan-control.service
+#TODO in testing, remove this line when ready for release
+
+fast_loop_interval: 0.2
+slow_loop_interval: 1
+control_loop_ratio: 5
+log_write_ratio: 1
+base_hwmon_path: /sys/class/hwmon/
+charge_state_path:  false # disabled on fremont
+
+fan_hwmon_name: steamdeck_hwmon
+fan_hwmon_name_alt: jupiter
+fan_min_speed: 10
+fan_threshold_speed: 500
+fan_max_speed: 1800
+fan_min_time_on: 0
+fan_gain: 10
+ec_ramp_rate: 10
+
+A_quad_control: &A_quad_control 0.25
+B_quad_control: &B_quad_control -20
+C_quad_control: &C_quad_control 875
+# quadratic fit (50,500)(70,700)(90,1100)
+
+A_ff_control: &A_ff_control 5
+B_ff_control: &B_ff_control -300
+# linear fit (60,0),(100,200)
+
+T_threshold: &T_threshold 50
+
+fan_hysteresis: 300
+
+sensors:
+  - hwmon_name: amdgpu
+    nice_name: P_GPU
+    sensor_name: power1_average
+    sensor_time_avg: 45
+    low_power_threshold: 60
+
+devices:
+  - hwmon_name: acpitz
+    nice_name: CPU
+    max_temp: 102
+    temp_hysteresis: 0
+    sensor_name: temp1
+    poll_mult: 1
+    type: ffquad
+    T_threshold: *T_threshold
+    A_quad: *A_quad_control
+    B_quad: *B_quad_control
+    C_quad: *C_quad_control
+    A_ff: *A_ff_control
+    B_ff: *B_ff_control
+
+  - hwmon_name: amdgpu
+    nice_name: GPU_JXN
+    max_temp: 102
+    temp_hysteresis: 0
+    sensor_name: temp2
+    poll_mult: 1
+    type: ffquad
+    T_threshold: *T_threshold
+    A_quad: *A_quad_control
+    B_quad: *B_quad_control
+    C_quad: *C_quad_control
+    A_ff: *A_ff_control
+    B_ff: *B_ff_control
+
+  - hwmon_name: amdgpu
+    nice_name: GPU_MEM
+    max_temp: 102
+    temp_hysteresis: 0
+    sensor_name: temp3
+    poll_mult: 1
+    type: dummy
