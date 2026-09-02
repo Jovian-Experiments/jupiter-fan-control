@@ -85,6 +85,7 @@ class Fan:
         """constructor"""
         self.fan_path = fan_path
         self.charge_state_path = config["charge_state_path"]
+        self.charge_state_path_read_error = False
         self.min_speed = config["fan_min_speed"]
         self.threshold_speed = config["fan_threshold_speed"]
         self.max_speed = config["fan_max_speed"]
@@ -164,8 +165,18 @@ class Fan:
         """updates min rpm depending on charge state"""
         if self.charge_state_path is False:
             return False
-        with open(self.charge_state_path, encoding="utf8") as f:
-            state = f.read().strip()
+
+        try:
+            with open(self.charge_state_path, encoding="utf-8") as f:
+                state = f.read().strip()
+                self.charge_state_path_read_error = False
+        except Exception as e:
+            state = "Unknown"
+            # print error, only once (if error repeats immediately)
+            if not self.charge_state_path_read_error:
+                print(f"error: {e} (successive repeats suppressed, if any)")
+            self.charge_state_path_read_error = True
+
         if state == "Charging":
             self.charge_state = True
         else:
